@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QStatusBar, QMenuBar, QMenu, QLabel,
     QPushButton, QScrollArea, QFrame, QSizePolicy,
     QStackedWidget, QGraphicsDropShadowEffect, QSlider,
-    QLineEdit, QComboBox, QCheckBox
+    QLineEdit, QComboBox, QCheckBox, QTreeWidget, QTreeWidgetItem
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QAction, QIcon, QColor, QPalette, QLinearGradient, QGradient, QPainter, QPainterPath
@@ -36,6 +36,14 @@ COLORS = {
     'search_border': '#404040',
     'toggle_active': '#1DB954',
     'toggle_inactive': '#404040',
+    'card_gradient_start': '#2A2A2A',
+    'card_gradient_end': '#1A1A1A',
+    'card_active_glow': '#1DB954',
+    'folder_bg': '#2D2D2D',
+    'folder_hover': '#353535',
+    'folder_active': '#3A3A3A',
+    'folder_icon': '#FFC107',  # Amber color for folder icon
+    'add_folder_bg': '#383838',
 }
 
 class SearchBar(QLineEdit):
@@ -101,22 +109,30 @@ class ModernButton(QPushButton):
             """)
 
 class SoundCard(QFrame):
-    """Modern sound card with waveform"""
+    """Modern sound card with enhanced visual elements"""
     def __init__(self, title, category, parent=None):
         super().__init__(parent)
         self.setFixedSize(200, 200)
         self.title = title
         self.category = category
+        self.is_active = False
         self._setup_ui()
         
     def _setup_ui(self):
+        # Set up the main card style
         self.setStyleSheet(f"""
             SoundCard {{
-                background-color: {COLORS['bg_elevated']};
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {COLORS['card_gradient_start']},
+                    stop:1 {COLORS['card_gradient_end']});
                 border-radius: 8px;
+                border: 1px solid {COLORS['divider']};
             }}
             SoundCard:hover {{
-                background-color: {COLORS['card_hover']};
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {COLORS['card_hover']},
+                    stop:1 {COLORS['bg_elevated']});
+                border: 1px solid {COLORS['accent']};
             }}
         """)
         
@@ -131,44 +147,102 @@ class SoundCard(QFrame):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
         
+        # Top section with category and preview
+        top_section = QHBoxLayout()
+        
         # Category indicator
         category_indicator = QFrame()
-        category_indicator.setFixedHeight(4)
+        category_indicator.setFixedSize(4, 20)
         category_indicator.setStyleSheet(f"""
             background-color: {COLORS[f'category_{self.category}']};
             border-radius: 2px;
         """)
-        layout.addWidget(category_indicator)
+        top_section.addWidget(category_indicator)
         
-        # Title
+        # Preview button
+        preview_btn = ModernButton("🔊")
+        preview_btn.setFixedSize(24, 24)
+        preview_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['bg_secondary']};
+                color: {COLORS['text_secondary']};
+                border: none;
+                border-radius: 12px;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['accent']};
+                color: {COLORS['text_primary']};
+            }}
+        """)
+        top_section.addWidget(preview_btn)
+        top_section.addStretch()
+        
+        layout.addLayout(top_section)
+        
+        # Title with icon
+        title_layout = QHBoxLayout()
+        
+        # Category icon (placeholder)
+        category_icon = QLabel("🎵")
+        category_icon.setStyleSheet(f"font-size: 16px;")
+        title_layout.addWidget(category_icon)
+        
         title_label = QLabel(self.title)
         title_label.setStyleSheet(f"""
             color: {COLORS['text_primary']};
             font-size: 14px;
             font-weight: bold;
         """)
-        layout.addWidget(title_label)
+        title_layout.addWidget(title_label)
+        title_layout.addStretch()
         
-        # Waveform placeholder
+        layout.addLayout(title_layout)
+        
+        # Waveform placeholder with gradient
         waveform = QFrame()
         waveform.setFixedHeight(60)
         waveform.setStyleSheet(f"""
-            background-color: {COLORS['bg_secondary']};
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 {COLORS['bg_secondary']},
+                stop:1 {COLORS['bg_elevated']});
             border-radius: 4px;
         """)
         layout.addWidget(waveform)
         
-        # Controls
+        # Bottom controls
         controls = QHBoxLayout()
+        
+        # Play button with gradient
         play_btn = ModernButton("▶")
         play_btn.setFixedSize(32, 32)
+        play_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {COLORS['accent_gradient_start']},
+                    stop:1 {COLORS['accent_gradient_end']});
+                color: {COLORS['text_primary']};
+                border: none;
+                border-radius: 16px;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {COLORS['accent']},
+                    stop:1 {COLORS['accent']});
+            }}
+        """)
         controls.addWidget(play_btn)
+        
         controls.addStretch()
         
+        # Hotkey indicator with gradient
         hotkey_label = QLabel("F1")
         hotkey_label.setStyleSheet(f"""
             color: {COLORS['text_secondary']};
-            background-color: {COLORS['bg_secondary']};
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 {COLORS['bg_secondary']},
+                stop:1 {COLORS['bg_elevated']});
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 12px;
@@ -177,6 +251,30 @@ class SoundCard(QFrame):
         
         layout.addLayout(controls)
         layout.addStretch()
+
+    def set_active(self, active):
+        """Set the card's active state"""
+        self.is_active = active
+        if active:
+            self.setStyleSheet(f"""
+                SoundCard {{
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 {COLORS['card_gradient_start']},
+                        stop:1 {COLORS['card_gradient_end']});
+                    border-radius: 8px;
+                    border: 2px solid {COLORS['card_active_glow']};
+                }}
+            """)
+        else:
+            self.setStyleSheet(f"""
+                SoundCard {{
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 {COLORS['card_gradient_start']},
+                        stop:1 {COLORS['card_gradient_end']});
+                    border-radius: 8px;
+                    border: 1px solid {COLORS['divider']};
+                }}
+            """)
 
 class ModernSlider(QSlider):
     """Modern styled slider with value display"""
@@ -349,12 +447,282 @@ class ControlPanel(QFrame):
         layout.addWidget(controls_group)
         layout.addStretch()
 
+class FolderView(QFrame):
+    """Folder view for organizing sounds"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._setup_ui()
+        self._populate_sample_folders()
+        
+    def _setup_ui(self):
+        self.setStyleSheet(f"""
+            FolderView {{
+                background-color: {COLORS['bg_primary']};
+                border: none;
+            }}
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
+        
+        # Header with title and add button
+        header = QHBoxLayout()
+        
+        title = QLabel("Folders")
+        title.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 24px;
+            font-weight: bold;
+        """)
+        header.addWidget(title)
+        
+        header.addStretch()
+        
+        add_folder_btn = ModernButton("+ New Folder", is_primary=True)
+        header.addWidget(add_folder_btn)
+        
+        layout.addLayout(header)
+        
+        # Folder list (showing visual representation only)
+        folders_container = QScrollArea()
+        folders_container.setWidgetResizable(True)
+        folders_container.setFrameShape(QFrame.Shape.NoFrame)
+        folders_container.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #404040;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        folders_widget = QWidget()
+        folders_layout = QVBoxLayout(folders_widget)
+        folders_layout.setContentsMargins(0, 0, 0, 0)
+        folders_layout.setSpacing(10)
+        
+        folders_container.setWidget(folders_widget)
+        layout.addWidget(folders_container)
+        
+        self.folders_layout = folders_layout
+    
+    def _populate_sample_folders(self):
+        """Add sample folders for visualization"""
+        # Clear existing folders
+        for i in reversed(range(self.folders_layout.count())):
+            item = self.folders_layout.itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        # Add new folder button
+        new_folder_frame = QFrame()
+        new_folder_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['add_folder_bg']};
+                border: 1px dashed {COLORS['divider']};
+                border-radius: 8px;
+            }}
+            QFrame:hover {{
+                border: 1px dashed {COLORS['accent']};
+            }}
+        """)
+        new_folder_frame.setFixedHeight(60)
+        
+        new_folder_layout = QHBoxLayout(new_folder_frame)
+        new_folder_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        new_folder_label = QLabel("+ Create New Folder")
+        new_folder_label.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            font-size: 14px;
+        """)
+        new_folder_layout.addWidget(new_folder_label)
+        
+        self.folders_layout.addWidget(new_folder_frame)
+        
+        # Sample folders
+        sample_folders = [
+            ("Sound Effects", 12),
+            ("Meme Sounds", 8),
+            ("Music Clips", 5),
+            ("Custom Recordings", 3)
+        ]
+        
+        for name, count in sample_folders:
+            folder_item = self.create_folder_item(name, count)
+            self.folders_layout.addWidget(folder_item)
+        
+        self.folders_layout.addStretch()
+    
+    def create_folder_item(self, name, sound_count):
+        """Create a folder item widget"""
+        folder_frame = QFrame()
+        folder_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['folder_bg']};
+                border-radius: 8px;
+            }}
+            QFrame:hover {{
+                background-color: {COLORS['folder_hover']};
+            }}
+        """)
+        folder_frame.setFixedHeight(70)
+        
+        # Add shadow effect
+        shadow = QGraphicsDropShadowEffect(folder_frame)
+        shadow.setBlurRadius(10)
+        shadow.setColor(QColor(COLORS['shadow']))
+        shadow.setOffset(0, 2)
+        folder_frame.setGraphicsEffect(shadow)
+        
+        folder_layout = QHBoxLayout(folder_frame)
+        
+        # Folder icon
+        folder_icon = QLabel("📁")
+        folder_icon.setStyleSheet(f"""
+            font-size: 24px;
+            color: {COLORS['folder_icon']};
+        """)
+        folder_layout.addWidget(folder_icon)
+        
+        # Folder info
+        folder_info = QVBoxLayout()
+        
+        folder_name = QLabel(name)
+        folder_name.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 16px;
+            font-weight: bold;
+        """)
+        folder_info.addWidget(folder_name)
+        
+        folder_count = QLabel(f"{sound_count} sounds")
+        folder_count.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            font-size: 12px;
+        """)
+        folder_info.addWidget(folder_count)
+        
+        folder_layout.addLayout(folder_info)
+        folder_layout.addStretch()
+        
+        # Action buttons
+        actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(8)
+        
+        edit_btn = ModernButton("Edit")
+        edit_btn.setFixedSize(60, 30)
+        actions_layout.addWidget(edit_btn)
+        
+        play_all_btn = ModernButton("Play All")
+        play_all_btn.setFixedSize(80, 30)
+        actions_layout.addWidget(play_all_btn)
+        
+        folder_layout.addLayout(actions_layout)
+        
+        return folder_frame
+
+class FolderContentView(QFrame):
+    """View for displaying sounds in a selected folder"""
+    def __init__(self, folder_name, parent=None):
+        super().__init__(parent)
+        self.folder_name = folder_name
+        self._setup_ui()
+        
+    def _setup_ui(self):
+        self.setStyleSheet(f"""
+            FolderContentView {{
+                background-color: {COLORS['bg_primary']};
+                border: none;
+            }}
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
+        
+        # Header with folder name and actions
+        header = QHBoxLayout()
+        
+        # Back button
+        back_btn = ModernButton("← Back")
+        header.addWidget(back_btn)
+        
+        title = QLabel(self.folder_name)
+        title.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 24px;
+            font-weight: bold;
+            margin-left: 10px;
+        """)
+        header.addWidget(title)
+        
+        header.addStretch()
+        
+        add_sound_btn = ModernButton("+ Add Sound", is_primary=True)
+        header.addWidget(add_sound_btn)
+        
+        layout.addLayout(header)
+        
+        # Folder content (sounds grid)
+        content_area = QScrollArea()
+        content_area.setWidgetResizable(True)
+        content_area.setFrameShape(QFrame.Shape.NoFrame)
+        content_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #404040;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        content_widget = QWidget()
+        content_layout = QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
+        
+        # Sample sound cards for this folder
+        sample_sounds = [
+            ("Folder Sound 1", 1),
+            ("Folder Sound 2", 2),
+            ("Folder Sound 3", 3)
+        ]
+        
+        for title, category in sample_sounds:
+            card = SoundCard(title, category)
+            content_layout.addWidget(card)
+        
+        content_layout.addStretch()
+        
+        content_area.setWidget(content_widget)
+        layout.addWidget(content_area)
+
 class MainWindow(QMainWindow):
     """Main application window"""
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Soundboard")
+        self.setWindowTitle("SoundWave")
         self.setMinimumSize(1200, 800)
         
         # Set window style
@@ -415,7 +783,7 @@ class MainWindow(QMainWindow):
         icon_label.setStyleSheet(f"font-size: 24px;")
         title_layout.addWidget(icon_label)
         
-        title = QLabel("Soundboard")
+        title = QLabel("SoundWave")
         title.setStyleSheet(f"""
             color: {COLORS['text_primary']};
             font-size: 24px;
@@ -448,12 +816,15 @@ class MainWindow(QMainWindow):
         tabs_layout.setSpacing(4)
         tabs_layout.setContentsMargins(0, 16, 0, 0)
         
-        categories = ["All Sounds", "Effects", "Music", "Voice", "Custom"]
+        categories = ["All Sounds", "Favourites", "Folders"]
+        self.category_buttons = []
+        
         for category in categories:
             tab = ModernButton(category)
             tab.setCheckable(True)
             if category == "All Sounds":
                 tab.setChecked(True)
+            self.category_buttons.append(tab)
             tabs_layout.addWidget(tab)
         
         tabs_layout.addStretch()
@@ -476,7 +847,29 @@ class MainWindow(QMainWindow):
         self.content_layout.addWidget(header)
     
     def _create_main_content(self):
-        """Create the main content area with sound cards"""
+        """Create the main content area with stacked views"""
+        # Create stacked widget for different views
+        self.content_stack = QStackedWidget()
+        self.content_stack.setStyleSheet(f"""
+            background-color: {COLORS['bg_primary']};
+        """)
+        
+        # Sound grid view (default)
+        self.sound_grid_view = self._create_sound_grid_view()
+        self.content_stack.addWidget(self.sound_grid_view)
+        
+        # Folder view 
+        self.folder_view = FolderView()
+        self.content_stack.addWidget(self.folder_view)
+        
+        # Folder content view sample
+        self.folder_content_view = FolderContentView("Sound Effects")
+        self.content_stack.addWidget(self.folder_content_view)
+        
+        self.content_layout.addWidget(self.content_stack)
+    
+    def _create_sound_grid_view(self):
+        """Create the main sound grid view"""
         content_area = QFrame()
         content_area.setStyleSheet(f"""
             QFrame {{
@@ -536,7 +929,7 @@ class MainWindow(QMainWindow):
         scroll_area.setWidget(grid_widget)
         content_layout.addWidget(scroll_area)
         
-        self.content_layout.addWidget(content_area)
+        return content_area
     
     def _create_status_bar(self):
         """Create the status bar"""
