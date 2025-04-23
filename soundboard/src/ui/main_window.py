@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QStatusBar, QMenuBar, QMenu, QLabel,
     QPushButton, QScrollArea, QFrame, QSizePolicy,
     QStackedWidget, QGraphicsDropShadowEffect, QSlider,
-    QLineEdit
+    QLineEdit, QComboBox, QCheckBox
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QAction, QIcon, QColor, QPalette, QLinearGradient, QGradient, QPainter, QPainterPath
@@ -34,6 +34,8 @@ COLORS = {
     'panel_bg': '#202020',
     'search_bg': '#2A2A2A',
     'search_border': '#404040',
+    'toggle_active': '#1DB954',
+    'toggle_inactive': '#404040',
 }
 
 class SearchBar(QLineEdit):
@@ -176,6 +178,177 @@ class SoundCard(QFrame):
         layout.addLayout(controls)
         layout.addStretch()
 
+class ModernSlider(QSlider):
+    """Modern styled slider with value display"""
+    def __init__(self, parent=None):
+        super().__init__(Qt.Orientation.Horizontal, parent)
+        self.setStyleSheet(f"""
+            QSlider {{
+                height: 24px;
+            }}
+            QSlider::groove:horizontal {{
+                height: 4px;
+                background: {COLORS['slider_bg']};
+                border-radius: 2px;
+            }}
+            QSlider::handle:horizontal {{
+                background: {COLORS['slider_handle']};
+                width: 16px;
+                height: 16px;
+                margin: -6px 0;
+                border-radius: 8px;
+            }}
+            QSlider::sub-page:horizontal {{
+                background: {COLORS['accent']};
+                border-radius: 2px;
+            }}
+        """)
+        self.setMaximum(100)
+        self.setValue(70)
+
+class ModernComboBox(QComboBox):
+    """Modern styled combobox"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {COLORS['bg_elevated']};
+                border: 1px solid {COLORS['divider']};
+                border-radius: 4px;
+                padding: 8px 16px;
+                color: {COLORS['text_primary']};
+                font-size: 13px;
+            }}
+            QComboBox:hover {{
+                border: 1px solid {COLORS['accent']};
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                width: 20px;
+            }}
+            QComboBox::down-arrow {{
+                image: none;
+                border: none;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {COLORS['bg_elevated']};
+                border: 1px solid {COLORS['divider']};
+                selection-background-color: {COLORS['accent']};
+                selection-color: {COLORS['text_primary']};
+            }}
+        """)
+
+class ModernToggle(QCheckBox):
+    """Modern styled toggle switch"""
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setStyleSheet(f"""
+            QCheckBox {{
+                color: {COLORS['text_primary']};
+                font-size: 13px;
+                spacing: 8px;
+            }}
+            QCheckBox::indicator {{
+                width: 40px;
+                height: 20px;
+                border-radius: 10px;
+                background-color: {COLORS['toggle_inactive']};
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {COLORS['toggle_active']};
+            }}
+            QCheckBox::indicator::unchecked {{
+                background-color: {COLORS['toggle_inactive']};
+            }}
+        """)
+
+class ControlPanel(QFrame):
+    """Right-side control panel with modern settings"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedWidth(300)
+        self._setup_ui()
+
+    def _setup_ui(self):
+        self.setStyleSheet(f"""
+            ControlPanel {{
+                background-color: {COLORS['panel_bg']};
+                border-left: 1px solid {COLORS['divider']};
+            }}
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(24)
+
+        # Header
+        header = QLabel("Quick Settings")
+        header.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 18px;
+            font-weight: bold;
+            padding-bottom: 8px;
+            border-bottom: 1px solid {COLORS['divider']};
+        """)
+        layout.addWidget(header)
+
+        # Volume Control
+        volume_group = QFrame()
+        volume_layout = QVBoxLayout(volume_group)
+        volume_layout.setSpacing(8)
+
+        volume_header = QHBoxLayout()
+        volume_label = QLabel("Output Volume")
+        volume_label.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: 14px;")
+        volume_header.addWidget(volume_label)
+        volume_value = QLabel("70%")
+        volume_value.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        volume_header.addWidget(volume_value)
+        volume_layout.addLayout(volume_header)
+
+        self.volume_slider = ModernSlider()
+        volume_layout.addWidget(self.volume_slider)
+        layout.addWidget(volume_group)
+
+        # Audio Devices
+        devices_group = QFrame()
+        devices_layout = QVBoxLayout(devices_group)
+        devices_layout.setSpacing(16)
+
+        # Input Device
+        input_label = QLabel("Input Device")
+        input_label.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: 14px;")
+        devices_layout.addWidget(input_label)
+        self.input_device = ModernComboBox()
+        self.input_device.addItems(["Default Microphone", "USB Microphone", "System Audio"])
+        devices_layout.addWidget(self.input_device)
+
+        # Output Device
+        output_label = QLabel("Output Device")
+        output_label.setStyleSheet(f"color: {COLORS['text_primary']}; font-size: 14px;")
+        devices_layout.addWidget(output_label)
+        self.output_device = ModernComboBox()
+        self.output_device.addItems(["Default Speakers", "Headphones", "System Audio"])
+        devices_layout.addWidget(self.output_device)
+
+        layout.addWidget(devices_group)
+
+        # Soundboard Controls
+        controls_group = QFrame()
+        controls_layout = QVBoxLayout(controls_group)
+        controls_layout.setSpacing(16)
+
+        # Active Toggle
+        self.active_toggle = ModernToggle("Soundboard Active")
+        controls_layout.addWidget(self.active_toggle)
+
+        # Hear Myself Toggle
+        self.hear_myself = ModernToggle("Hear Myself")
+        controls_layout.addWidget(self.hear_myself)
+
+        layout.addWidget(controls_group)
+        layout.addStretch()
+
 class MainWindow(QMainWindow):
     """Main application window"""
     
@@ -207,15 +380,8 @@ class MainWindow(QMainWindow):
         # Initialize UI components
         self._init_ui()
 
-        # Add control panel placeholder
-        self.control_panel = QFrame()
-        self.control_panel.setFixedWidth(300)
-        self.control_panel.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLORS['panel_bg']};
-                border-left: 1px solid {COLORS['divider']};
-            }}
-        """)
+        # Add control panel
+        self.control_panel = ControlPanel()
         self.main_layout.addWidget(self.content_area)
         self.main_layout.addWidget(self.control_panel)
 
