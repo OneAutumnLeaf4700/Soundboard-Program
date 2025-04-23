@@ -758,6 +758,20 @@ class MainWindow(QMainWindow):
         self._create_header()
         self._create_main_content()
         self._create_status_bar()
+        
+        # Connect buttons to their views
+        self._connect_tab_buttons()
+    
+    def _connect_tab_buttons(self):
+        """Connect category buttons to show appropriate views"""
+        # All Sounds button (index 0)
+        self.category_buttons[0].clicked.connect(lambda: self.content_stack.setCurrentIndex(0))
+        
+        # Favourites button (index 1)
+        self.category_buttons[1].clicked.connect(lambda: self.content_stack.setCurrentIndex(0))  # For now, just show all sounds
+        
+        # Folders button (index 2)
+        self.category_buttons[2].clicked.connect(lambda: self.content_stack.setCurrentIndex(1))  # Show folder view
     
     def _create_header(self):
         """Create the modern header area with gradient"""
@@ -819,11 +833,14 @@ class MainWindow(QMainWindow):
         categories = ["All Sounds", "Favourites", "Folders"]
         self.category_buttons = []
         
-        for category in categories:
+        for i, category in enumerate(categories):
             tab = ModernButton(category)
             tab.setCheckable(True)
-            if category == "All Sounds":
-                tab.setChecked(True)
+            tab.setChecked(i == 0)  # Check the first one by default
+            
+            # Set onclick to update which tab is checked
+            tab.clicked.connect(lambda checked, btn=tab: self._handle_tab_click(btn))
+            
             self.category_buttons.append(tab)
             tabs_layout.addWidget(tab)
         
@@ -845,6 +862,14 @@ class MainWindow(QMainWindow):
         header_layout.addLayout(tabs_layout)
         
         self.content_layout.addWidget(header)
+    
+    def _handle_tab_click(self, clicked_button):
+        """Handle tab button clicks to ensure only one is checked"""
+        for button in self.category_buttons:
+            if button != clicked_button:
+                button.setChecked(False)
+            else:
+                button.setChecked(True)
     
     def _create_main_content(self):
         """Create the main content area with stacked views"""
