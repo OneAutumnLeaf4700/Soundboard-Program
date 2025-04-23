@@ -1,68 +1,88 @@
 """
-Main Window Implementation with Minimal Studio Design
+Main Window Implementation with Modern Card Design
 """
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QStatusBar, QMenuBar, QMenu, QLabel,
-    QPushButton, QScrollArea, QFrame, QSizePolicy
+    QPushButton, QScrollArea, QFrame, QSizePolicy,
+    QStackedWidget
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QAction, QIcon, QColor, QPalette
 
-# Color scheme
+# Modern color scheme
 COLORS = {
-    'bg_dark': '#1E1E1E',
-    'bg_light': '#252526',
-    'accent': '#007ACC',
-    'text': '#CCCCCC',
-    'text_dim': '#808080',
-    'border': '#333333',
-    'hover': '#2A2D2E'
+    'bg_primary': '#121212',
+    'bg_secondary': '#181818',
+    'bg_elevated': '#282828',
+    'accent': '#1DB954',  # Vibrant green
+    'text_primary': '#FFFFFF',
+    'text_secondary': '#B3B3B3',
+    'card_hover': '#2A2A2A',
+    'divider': '#282828'
 }
 
-class StudioButton(QPushButton):
-    """Custom button with minimal studio design"""
-    def __init__(self, text, parent=None, is_sidebar=False):
+class ModernButton(QPushButton):
+    """Modern styled button"""
+    def __init__(self, text, parent=None, is_primary=False):
         super().__init__(text, parent)
-        self.is_sidebar = is_sidebar
+        self.is_primary = is_primary
         self._setup_style()
         
     def _setup_style(self):
-        if self.is_sidebar:
-            self.setFixedHeight(40)
+        if self.is_primary:
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {COLORS['bg_dark']};
-                    color: {COLORS['text_dim']};
+                    background-color: {COLORS['accent']};
+                    color: {COLORS['text_primary']};
                     border: none;
-                    text-align: left;
-                    padding: 10px 15px;
+                    border-radius: 20px;
+                    padding: 8px 24px;
+                    font-weight: bold;
                     font-size: 13px;
                 }}
                 QPushButton:hover {{
-                    background-color: {COLORS['hover']};
-                    color: {COLORS['text']};
-                }}
-                QPushButton:checked {{
-                    background-color: {COLORS['bg_light']};
-                    color: {COLORS['text']};
-                    border-left: 2px solid {COLORS['accent']};
+                    background-color: #1ed760;
                 }}
             """)
         else:
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {COLORS['bg_light']};
-                    color: {COLORS['text']};
+                    background-color: {COLORS['bg_elevated']};
+                    color: {COLORS['text_primary']};
                     border: none;
-                    padding: 8px 15px;
                     border-radius: 4px;
+                    padding: 8px 16px;
+                    font-size: 13px;
                 }}
                 QPushButton:hover {{
-                    background-color: {COLORS['hover']};
+                    background-color: {COLORS['card_hover']};
                 }}
             """)
+
+class CategoryTab(QPushButton):
+    """Modern category tab button"""
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setCheckable(True)
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_secondary']};
+                border: none;
+                padding: 8px 16px;
+                font-size: 14px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                color: {COLORS['text_primary']};
+            }}
+            QPushButton:checked {{
+                color: {COLORS['text_primary']};
+                border-bottom: 2px solid {COLORS['accent']};
+            }}
+        """)
 
 class MainWindow(QMainWindow):
     """Main application window"""
@@ -75,10 +95,10 @@ class MainWindow(QMainWindow):
         # Set window style
         self.setStyleSheet(f"""
             QMainWindow {{
-                background-color: {COLORS['bg_dark']};
+                background-color: {COLORS['bg_primary']};
             }}
             QFrame {{
-                background-color: {COLORS['bg_dark']};
+                background-color: {COLORS['bg_primary']};
                 border: none;
             }}
         """)
@@ -86,7 +106,7 @@ class MainWindow(QMainWindow):
         # Create central widget and layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        self.main_layout = QHBoxLayout(central_widget)
+        self.main_layout = QVBoxLayout(central_widget)
         self.main_layout.setSpacing(0)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         
@@ -95,153 +115,134 @@ class MainWindow(QMainWindow):
     
     def _init_ui(self):
         """Initialize UI components"""
-        self._create_menu_bar()
+        self._create_header()
         self._create_main_content()
         self._create_status_bar()
     
-    def _create_menu_bar(self):
-        """Create the application menu bar"""
-        menubar = self.menuBar()
-        menubar.setStyleSheet(f"""
-            QMenuBar {{
-                background-color: {COLORS['bg_dark']};
-                color: {COLORS['text']};
-                border-bottom: 1px solid {COLORS['border']};
-                padding: 2px;
-            }}
-            QMenuBar::item:selected {{
-                background-color: {COLORS['hover']};
-            }}
-            QMenu {{
-                background-color: {COLORS['bg_dark']};
-                color: {COLORS['text']};
-                border: 1px solid {COLORS['border']};
-            }}
-            QMenu::item:selected {{
-                background-color: {COLORS['hover']};
-            }}
-        """)
-        
-        # File menu
-        file_menu = menubar.addMenu("File")
-        file_menu.addAction("New Soundboard")
-        file_menu.addAction("Open Soundboard")
-        file_menu.addAction("Save Soundboard")
-        file_menu.addSeparator()
-        file_menu.addAction("Exit")
-        
-        # Edit menu
-        edit_menu = menubar.addMenu("Edit")
-        edit_menu.addAction("Add Sound")
-        edit_menu.addAction("Edit Sound")
-        edit_menu.addAction("Delete Sound")
-        
-        # View menu
-        view_menu = menubar.addMenu("View")
-        view_menu.addAction("Toggle Sidebar")
-        
-        # Settings menu
-        settings_menu = menubar.addMenu("Settings")
-        settings_menu.addAction("Audio Devices")
-        settings_menu.addAction("Hotkeys")
-        settings_menu.addAction("Theme")
-    
-    def _create_main_content(self):
-        """Create the main content area"""
-        # Create sidebar
-        sidebar = QFrame()
-        sidebar.setFixedWidth(220)
-        sidebar.setStyleSheet(f"""
+    def _create_header(self):
+        """Create the modern header area"""
+        header = QFrame()
+        header.setStyleSheet(f"""
             QFrame {{
-                background-color: {COLORS['bg_dark']};
-                border-right: 1px solid {COLORS['border']};
+                background-color: {COLORS['bg_secondary']};
+                border-bottom: 1px solid {COLORS['divider']};
             }}
         """)
+        header_layout = QVBoxLayout(header)
+        header_layout.setSpacing(0)
+        header_layout.setContentsMargins(24, 16, 24, 0)
         
-        sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setSpacing(1)
-        sidebar_layout.setContentsMargins(0, 10, 0, 10)
+        # Top bar with title and controls
+        top_bar = QHBoxLayout()
         
-        # Add sidebar sections
-        section_titles = ["LIBRARY", "PLAYLISTS", "SETTINGS"]
-        section_items = [
-            ["All Sounds", "Favorites", "Recent"],
-            ["Default", "Custom"],
-            ["Audio Devices", "Hotkeys", "Preferences"]
-        ]
-        
-        for title, items in zip(section_titles, section_items):
-            # Add section title
-            section_label = QLabel(title)
-            section_label.setStyleSheet(f"""
-                color: {COLORS['text_dim']};
-                font-size: 11px;
-                padding: 15px 15px 5px 15px;
-            """)
-            sidebar_layout.addWidget(section_label)
-            
-            # Add section items
-            for item in items:
-                btn = StudioButton(item, is_sidebar=True)
-                btn.setCheckable(True)
-                if item == "All Sounds":  # Set default selected
-                    btn.setChecked(True)
-                sidebar_layout.addWidget(btn)
-            
-            sidebar_layout.addSpacing(15)
-        
-        sidebar_layout.addStretch()
-        
-        # Create main sound grid area
-        main_area = QFrame()
-        main_area.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLORS['bg_light']};
-            }}
-        """)
-        
-        main_layout = QVBoxLayout(main_area)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        main_layout.setSpacing(20)
-        
-        # Add header
-        header_layout = QHBoxLayout()
-        header_label = QLabel("All Sounds")
-        header_label.setStyleSheet(f"""
-            color: {COLORS['text']};
+        # Title
+        title = QLabel("Soundboard")
+        title.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
             font-size: 24px;
             font-weight: bold;
         """)
-        header_layout.addWidget(header_label)
-        header_layout.addStretch()
+        top_bar.addWidget(title)
         
-        add_sound_btn = StudioButton("Add Sound")
-        header_layout.addWidget(add_sound_btn)
+        # Controls
+        controls_layout = QHBoxLayout()
+        controls_layout.setSpacing(8)
         
-        main_layout.addLayout(header_layout)
+        add_sound_btn = ModernButton("Add Sound", is_primary=True)
+        settings_btn = ModernButton("Settings")
         
-        # Add sound grid placeholder
-        sound_grid = QFrame()
-        sound_grid.setStyleSheet(f"""
+        controls_layout.addWidget(add_sound_btn)
+        controls_layout.addWidget(settings_btn)
+        
+        top_bar.addStretch()
+        top_bar.addLayout(controls_layout)
+        
+        # Category tabs
+        tabs_layout = QHBoxLayout()
+        tabs_layout.setSpacing(0)
+        tabs_layout.setContentsMargins(0, 16, 0, 0)
+        
+        categories = ["All Sounds", "Favorites", "Recent", "Custom"]
+        for category in categories:
+            tab = CategoryTab(category)
+            if category == "All Sounds":
+                tab.setChecked(True)
+            tabs_layout.addWidget(tab)
+        
+        tabs_layout.addStretch()
+        
+        header_layout.addLayout(top_bar)
+        header_layout.addLayout(tabs_layout)
+        
+        self.main_layout.addWidget(header)
+    
+    def _create_main_content(self):
+        """Create the main content area"""
+        content_area = QFrame()
+        content_area.setStyleSheet(f"""
             QFrame {{
-                background-color: {COLORS['bg_light']};
-                border-radius: 4px;
+                background-color: {COLORS['bg_primary']};
             }}
         """)
-        sound_grid.setMinimumHeight(400)
-        main_layout.addWidget(sound_grid)
         
-        # Add to main layout
-        self.main_layout.addWidget(sidebar)
-        self.main_layout.addWidget(main_area)
+        content_layout = QVBoxLayout(content_area)
+        content_layout.setContentsMargins(24, 24, 24, 24)
+        content_layout.setSpacing(24)
+        
+        # Create scrollable sound grid
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+            }
+            QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #404040;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        # Sound grid placeholder
+        grid_widget = QWidget()
+        grid_widget.setStyleSheet(f"""
+            background-color: {COLORS['bg_primary']};
+        """)
+        grid_layout = QVBoxLayout(grid_widget)
+        grid_layout.setContentsMargins(0, 0, 0, 0)
+        grid_layout.setSpacing(16)
+        
+        # Add placeholder text
+        placeholder = QLabel("Add sounds to get started")
+        placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        placeholder.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            font-size: 16px;
+            padding: 40px;
+        """)
+        grid_layout.addWidget(placeholder)
+        grid_layout.addStretch()
+        
+        scroll_area.setWidget(grid_widget)
+        content_layout.addWidget(scroll_area)
+        
+        self.main_layout.addWidget(content_area)
     
     def _create_status_bar(self):
         """Create the status bar"""
         status_bar = QStatusBar()
         status_bar.setStyleSheet(f"""
             QStatusBar {{
-                background-color: {COLORS['bg_dark']};
-                color: {COLORS['text_dim']};
+                background-color: {COLORS['bg_secondary']};
+                color: {COLORS['text_secondary']};
             }}
         """)
         self.setStatusBar(status_bar)
