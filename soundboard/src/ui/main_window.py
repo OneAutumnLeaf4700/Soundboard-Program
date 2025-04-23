@@ -64,6 +64,7 @@ class SearchBar(QLineEdit):
                 border: 1px solid {COLORS['accent']};
             }}
         """)
+        self.setFixedWidth(300)
         self.setFixedHeight(36)
 
 class ModernButton(QPushButton):
@@ -717,6 +718,175 @@ class FolderContentView(QFrame):
         content_area.setWidget(content_widget)
         layout.addWidget(content_area)
 
+class FavouritesView(QFrame):
+    """View for favourites sounds"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._setup_ui()
+        
+    def _setup_ui(self):
+        self.setStyleSheet(f"""
+            FavouritesView {{
+                background-color: {COLORS['bg_primary']};
+                border: none;
+            }}
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
+        
+        # Header with title, search bar and add button
+        header = QHBoxLayout()
+        
+        title = QLabel("Favourites")
+        title.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 24px;
+            font-weight: bold;
+        """)
+        header.addWidget(title)
+        
+        header.addStretch()
+        
+        # Search bar
+        search_bar = SearchBar()
+        header.addWidget(search_bar)
+        
+        # Add sound button
+        add_sound_btn = ModernButton("+ Add Sound", is_primary=True)
+        header.addWidget(add_sound_btn)
+        
+        layout.addLayout(header)
+        
+        # Content (sound grid)
+        content_area = QScrollArea()
+        content_area.setWidgetResizable(True)
+        content_area.setFrameShape(QFrame.Shape.NoFrame)
+        content_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #404040;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        content_widget = QWidget()
+        content_layout = QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
+        
+        # Sample favorites
+        sample_sounds = [
+            ("Favorite Sound 1", 1),
+            ("Favorite Sound 2", 2),
+            ("Favorite Sound 3", 3)
+        ]
+        
+        for title, category in sample_sounds:
+            card = SoundCard(title, category)
+            content_layout.addWidget(card)
+        
+        content_layout.addStretch()
+        
+        content_area.setWidget(content_widget)
+        layout.addWidget(content_area)
+
+class SoundGridView(QFrame):
+    """Main sound grid view"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._setup_ui()
+        
+    def _setup_ui(self):
+        self.setStyleSheet(f"""
+            SoundGridView {{
+                background-color: {COLORS['bg_primary']};
+                border: none;
+            }}
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
+        
+        # Header with title, search bar and add button
+        header = QHBoxLayout()
+        
+        title = QLabel("All Sounds")
+        title.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 24px;
+            font-weight: bold;
+        """)
+        header.addWidget(title)
+        
+        header.addStretch()
+        
+        # Search bar
+        search_bar = SearchBar()
+        header.addWidget(search_bar)
+        
+        # Add sound button
+        add_sound_btn = ModernButton("+ Add Sound", is_primary=True)
+        header.addWidget(add_sound_btn)
+        
+        layout.addLayout(header)
+        
+        # Content (sound grid)
+        content_area = QScrollArea()
+        content_area.setWidgetResizable(True)
+        content_area.setFrameShape(QFrame.Shape.NoFrame)
+        content_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #404040;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        content_widget = QWidget()
+        content_layout = QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
+        
+        # Sample sounds
+        sample_sounds = [
+            ("Epic Bass", 1),
+            ("Guitar Riff", 2),
+            ("Voice Effect", 3),
+            ("Custom Sound", 4)
+        ]
+        
+        for title, category in sample_sounds:
+            card = SoundCard(title, category)
+            content_layout.addWidget(card)
+        
+        content_layout.addStretch()
+        
+        content_area.setWidget(content_widget)
+        layout.addWidget(content_area)
+
 class MainWindow(QMainWindow):
     """Main application window"""
     
@@ -768,10 +938,10 @@ class MainWindow(QMainWindow):
         self.category_buttons[0].clicked.connect(lambda: self.content_stack.setCurrentIndex(0))
         
         # Favourites button (index 1)
-        self.category_buttons[1].clicked.connect(lambda: self.content_stack.setCurrentIndex(0))  # For now, just show all sounds
+        self.category_buttons[1].clicked.connect(lambda: self.content_stack.setCurrentIndex(1))  # Show favorites view
         
         # Folders button (index 2)
-        self.category_buttons[2].clicked.connect(lambda: self.content_stack.setCurrentIndex(1))  # Show folder view
+        self.category_buttons[2].clicked.connect(lambda: self.content_stack.setCurrentIndex(2))  # Show folder view
     
     def _create_header(self):
         """Create the modern header area with gradient"""
@@ -786,9 +956,9 @@ class MainWindow(QMainWindow):
         """)
         header_layout = QVBoxLayout(header)
         header_layout.setSpacing(0)
-        header_layout.setContentsMargins(24, 16, 24, 0)
+        header_layout.setContentsMargins(24, 16, 24, 16)
         
-        # Top bar with title and controls
+        # Top bar with title and settings
         top_bar = QHBoxLayout()
         
         # Title with accent
@@ -806,24 +976,11 @@ class MainWindow(QMainWindow):
         title_layout.addWidget(title)
         top_bar.addLayout(title_layout)
         
-        # Controls
-        controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(8)
-        
-        add_sound_btn = ModernButton("+ Add Sound", is_primary=True)
-        settings_btn = ModernButton("⚙ Settings")
-        
-        controls_layout.addWidget(add_sound_btn)
-        controls_layout.addWidget(settings_btn)
-        
         top_bar.addStretch()
-        top_bar.addLayout(controls_layout)
         
-        # Search bar
-        search_layout = QHBoxLayout()
-        search_layout.setContentsMargins(0, 16, 0, 0)
-        search_bar = SearchBar()
-        search_layout.addWidget(search_bar)
+        # Settings button only
+        settings_btn = ModernButton("⚙ Settings")
+        top_bar.addWidget(settings_btn)
         
         # Category tabs
         tabs_layout = QHBoxLayout()
@@ -858,7 +1015,6 @@ class MainWindow(QMainWindow):
         tabs_layout.addLayout(controls_right)
 
         header_layout.addLayout(top_bar)
-        header_layout.addLayout(search_layout)
         header_layout.addLayout(tabs_layout)
         
         self.content_layout.addWidget(header)
@@ -880,8 +1036,12 @@ class MainWindow(QMainWindow):
         """)
         
         # Sound grid view (default)
-        self.sound_grid_view = self._create_sound_grid_view()
+        self.sound_grid_view = SoundGridView()
         self.content_stack.addWidget(self.sound_grid_view)
+        
+        # Favourites view
+        self.favourites_view = FavouritesView()
+        self.content_stack.addWidget(self.favourites_view)
         
         # Folder view 
         self.folder_view = FolderView()
@@ -892,69 +1052,6 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(self.folder_content_view)
         
         self.content_layout.addWidget(self.content_stack)
-    
-    def _create_sound_grid_view(self):
-        """Create the main sound grid view"""
-        content_area = QFrame()
-        content_area.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLORS['bg_primary']};
-            }}
-        """)
-        
-        content_layout = QVBoxLayout(content_area)
-        content_layout.setContentsMargins(24, 24, 24, 24)
-        content_layout.setSpacing(24)
-        
-        # Create scrollable sound grid
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll_area.setStyleSheet("""
-            QScrollArea {
-                border: none;
-            }
-            QScrollBar:vertical {
-                width: 8px;
-                background: transparent;
-            }
-            QScrollBar::handle:vertical {
-                background: #404040;
-                border-radius: 4px;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-        """)
-        
-        # Sound grid with cards
-        grid_widget = QWidget()
-        grid_widget.setStyleSheet(f"""
-            background-color: {COLORS['bg_primary']};
-        """)
-        grid_layout = QHBoxLayout(grid_widget)
-        grid_layout.setContentsMargins(0, 0, 0, 0)
-        grid_layout.setSpacing(16)
-        
-        # Add some sample sound cards
-        sample_sounds = [
-            ("Epic Bass", 1),
-            ("Guitar Riff", 2),
-            ("Voice Effect", 3),
-            ("Custom Sound", 4)
-        ]
-        
-        for title, category in sample_sounds:
-            card = SoundCard(title, category)
-            grid_layout.addWidget(card)
-        
-        grid_layout.addStretch()
-        
-        scroll_area.setWidget(grid_widget)
-        content_layout.addWidget(scroll_area)
-        
-        return content_area
     
     def _create_status_bar(self):
         """Create the status bar"""
