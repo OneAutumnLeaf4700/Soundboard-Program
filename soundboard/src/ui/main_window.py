@@ -8,9 +8,9 @@ from PyQt6.QtWidgets import (
     QPushButton, QScrollArea, QFrame, QSizePolicy,
     QStackedWidget, QGraphicsDropShadowEffect, QSlider,
     QLineEdit, QComboBox, QCheckBox, QTreeWidget, QTreeWidgetItem,
-    QGridLayout, QButtonGroup
+    QGridLayout, QButtonGroup, QListWidget, QTabWidget, QSpacerItem
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal, QPoint
+from PyQt6.QtCore import Qt, QSize, pyqtSignal, QPoint, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QAction, QIcon, QColor, QPalette, QLinearGradient, QGradient, QPainter, QPainterPath
 
 # Enhanced color scheme
@@ -56,13 +56,15 @@ COLORS = {
     'count_badge_bg': '#383838',  # Add count badge background color
     'favorite_color': '#FFD700',  # Gold color for favorites
     'favorite_hover': '#FFC107',  # Lighter gold for hover
+    'delete_color': '#E53935',  # Red color for delete button
+    'accent_color': '#1DB954',  # Add accent color for folder icon
 }
 
 class SearchBar(QLineEdit):
     """Modern search bar with icon"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setPlaceholderText("Search sounds...")
+        self.setPlaceholderText("Search...")
         self.setStyleSheet(f"""
             QLineEdit {{
                 background-color: {COLORS['search_bg']};
@@ -164,7 +166,7 @@ class SoundCard(QFrame):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
         
-        # Top section with category, menu and preview
+        # Top section with category, title and menu
         top_section = QHBoxLayout()
         
         # Category indicator
@@ -176,23 +178,15 @@ class SoundCard(QFrame):
         """)
         top_section.addWidget(category_indicator)
         
-        # Preview button
-        preview_btn = ModernButton("🔊")
-        preview_btn.setFixedSize(24, 24)
-        preview_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['bg_secondary']};
-                color: {COLORS['text_secondary']};
-                border: none;
-                border-radius: 12px;
-                font-size: 12px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['accent']};
-                color: {COLORS['text_primary']};
-            }}
+        # Sound title at top left
+        title_label = QLabel(self.title)
+        title_label.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 4px;
         """)
-        top_section.addWidget(preview_btn)
+        top_section.addWidget(title_label)
         
         top_section.addStretch()
         
@@ -218,28 +212,9 @@ class SoundCard(QFrame):
         
         layout.addLayout(top_section)
         
-        # Title with icon
-        title_layout = QHBoxLayout()
-        
-        # Category icon (placeholder)
-        category_icon = QLabel("🎵")
-        category_icon.setStyleSheet(f"font-size: 16px;")
-        title_layout.addWidget(category_icon)
-        
-        title_label = QLabel(self.title)
-        title_label.setStyleSheet(f"""
-            color: {COLORS['text_primary']};
-            font-size: 14px;
-            font-weight: bold;
-        """)
-        title_layout.addWidget(title_label)
-        title_layout.addStretch()
-        
-        layout.addLayout(title_layout)
-        
         # Waveform placeholder with gradient
         waveform = QFrame()
-        waveform.setFixedHeight(60)
+        waveform.setFixedHeight(80)
         waveform.setStyleSheet(f"""
             background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                 stop:0 {COLORS['bg_secondary']},
@@ -251,9 +226,9 @@ class SoundCard(QFrame):
         # Bottom controls
         controls = QHBoxLayout()
         
-        # Play button with gradient
-        play_btn = ModernButton("▶")
-        play_btn.setFixedSize(32, 32)
+        # Play button with improved icon
+        play_btn = ModernButton("▶ Play")
+        play_btn.setFixedHeight(32)
         play_btn.setStyleSheet(f"""
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -263,6 +238,8 @@ class SoundCard(QFrame):
                 border: none;
                 border-radius: 16px;
                 font-size: 12px;
+                font-weight: bold;
+                padding: 4px 12px;
             }}
             QPushButton:hover {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -644,7 +621,7 @@ class ViewControls(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_ui()
-    
+        
     def _setup_ui(self):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -759,7 +736,7 @@ class ViewControls(QFrame):
         
         # Sort combobox
         self.sort_combo = QComboBox()
-        self.sort_combo.addItems(["Recent", "Name", "Duration"])
+        self.sort_combo.addItems(["Default", "Name", "Sound Count"])
         self.sort_combo.setStyleSheet(f"""
             QComboBox {{
                 background-color: {COLORS['bg_secondary']};
@@ -808,7 +785,7 @@ class ViewControls(QFrame):
     
     def _on_sort_changed(self, index):
         """Handle sort combo box change"""
-        sorts = ["recent", "name", "duration"]
+        sorts = ["default", "name", "sound_count"]
         if 0 <= index < len(sorts):
             # Emit signal with the selected sort option
             self.sort_changed.emit(sorts[index])
@@ -817,12 +794,21 @@ class SoundGridView(QFrame):
     """Main sound grid view"""
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.sounds = []
         self._setup_ui()
+        self._populate_sample_sounds()
         
     def _setup_ui(self):
         self.setStyleSheet(f"""
             SoundGridView {{
                 background-color: {COLORS['bg_primary']};
+                border: none;
+            }}
+            QFrame#sound_item:hover, QFrame#sound_card:hover {{
+                background-color: {COLORS['card_hover']};
+                border: 1px solid {COLORS['accent']};
+            }}
+            QLabel, QPushButton {{
                 border: none;
             }}
         """)
@@ -856,18 +842,42 @@ class SoundGridView(QFrame):
         
         # View controls
         controls_layout = QHBoxLayout()
-        view_controls = ViewControls()
-        controls_layout.addWidget(view_controls)
+        self.view_controls = ViewControls()
+        # Customize sort options for sounds
+        self.view_controls.sort_combo.clear()
+        self.view_controls.sort_combo.addItems(["Recent", "Name", "Duration"])
+        self.view_controls.grid_view_toggled.connect(self._toggle_view)
+        self.view_controls.size_changed.connect(self._change_size)
+        self.view_controls.sort_changed.connect(self._sort_sounds)
+        controls_layout.addWidget(self.view_controls)
         controls_layout.addStretch()
         layout.addLayout(controls_layout)
         
-        # Content (sound grid)
-        content_area = QScrollArea()
-        content_area.setWidgetResizable(True)
-        content_area.setFrameShape(QFrame.Shape.NoFrame)
-        content_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        content_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        content_area.setStyleSheet("""
+        # Create stacked widget for different views
+        self.view_stack = QStackedWidget()
+        
+        # Grid view for sounds
+        self.grid_view = self._create_grid_view()
+        self.view_stack.addWidget(self.grid_view)
+        
+        # List view for sounds
+        self.list_view = self._create_list_view()
+        self.view_stack.addWidget(self.list_view)
+        
+        # Add the stacked widget to the main layout
+        layout.addWidget(self.view_stack)
+        
+        # Set default view
+        self.view_stack.setCurrentIndex(0)  # Start with grid view
+        
+    def _create_grid_view(self):
+        """Create the grid view for sounds"""
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("""
             QScrollArea {
                 border: none;
                 background: transparent;
@@ -885,47 +895,488 @@ class SoundGridView(QFrame):
             }
         """)
         
-        content_widget = QWidget()
-        content_layout = QGridLayout(content_widget)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(16)
+        self.grid_content = QWidget()
+        self.sound_grid = QGridLayout(self.grid_content)
+        self.sound_grid.setContentsMargins(0, 0, 0, 0)
+        self.sound_grid.setSpacing(16)
         
-        # Many sample sounds to demonstrate scrolling
+        scroll_area.setWidget(self.grid_content)
+        return scroll_area
+        
+    def _create_list_view(self):
+        """Create the list view for sounds"""
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #404040;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        list_container = QWidget()
+        self.sound_list_layout = QVBoxLayout(list_container)
+        self.sound_list_layout.setContentsMargins(0, 0, 0, 0)
+        self.sound_list_layout.setSpacing(8)
+        self.sound_list_layout.addStretch()
+        
+        scroll_area.setWidget(list_container)
+        return scroll_area
+    
+    def _populate_sample_sounds(self):
+        """Add sample sounds for visualization"""
+        # Sample sounds
         sample_sounds = [
-            ("Epic Bass Drop", 1),
-            ("Guitar Riff", 2),
-            ("Voice Effect", 3),
-            ("Custom Sound", 4),
-            ("Drum Roll", 1),
-            ("Synth Wave", 2),
-            ("Record Scratch", 3),
-            ("Crowd Cheer", 4),
-            ("Glass Breaking", 1),
-            ("Air Horn", 2),
-            ("Applause", 3),
-            ("Door Slam", 4)
+            {"id": "sound1", "title": "Epic Bass Drop", "category": 1, "duration": "0:30", "favorite": False},
+            {"id": "sound2", "title": "Guitar Riff", "category": 2, "duration": "0:15", "favorite": True},
+            {"id": "sound3", "title": "Voice Effect", "category": 3, "duration": "0:10", "favorite": False},
+            {"id": "sound4", "title": "Custom Sound", "category": 4, "duration": "0:22", "favorite": False},
+            {"id": "sound5", "title": "Drum Roll", "category": 1, "duration": "0:08", "favorite": False},
+            {"id": "sound6", "title": "Synth Wave", "category": 2, "duration": "0:45", "favorite": True},
+            {"id": "sound7", "title": "Record Scratch", "category": 3, "duration": "0:02", "favorite": False},
+            {"id": "sound8", "title": "Crowd Cheer", "category": 4, "duration": "0:12", "favorite": False},
+            {"id": "sound9", "title": "Glass Breaking", "category": 1, "duration": "0:03", "favorite": False},
+            {"id": "sound10", "title": "Air Horn", "category": 2, "duration": "0:05", "favorite": False},
+            {"id": "sound11", "title": "Applause", "category": 3, "duration": "0:10", "favorite": True},
+            {"id": "sound12", "title": "Door Slam", "category": 4, "duration": "0:02", "favorite": False}
         ]
         
-        # Create a proper grid layout
-        for i, (title, category) in enumerate(sample_sounds):
-            row = i // 4  # 4 cards per row
-            col = i % 4
-            card = SoundCard(title, category)
-            content_layout.addWidget(card, row, col)
+        # Store sound data
+        self.sounds = sample_sounds
         
-        content_area.setWidget(content_widget)
-        layout.addWidget(content_area)
+        # Create sound cards for grid view and list items for list view
+        for i, sound in enumerate(self.sounds):
+            self._create_sound_card(i, sound)
+            self._create_sound_list_item(sound)
+    
+    def _create_sound_card(self, index, sound_data):
+        """Create a sound card widget and add it to the grid"""
+        columns = 4  # Default column count
+        row = index // columns
+        col = index % columns
+        
+        # Create the sound card
+        card = SoundCard(sound_data["title"], sound_data["category"], sound_data["id"], sound_data["favorite"])
+        card.setObjectName("sound_card")  # Set object name for styling
+        card.sound_clicked.connect(self._on_sound_action)
+        
+        # Add to grid
+        self.sound_grid.addWidget(card, row, col)
+    
+    def _create_sound_list_item(self, sound_data):
+        """Create a list item for a sound in list view"""
+        item = QFrame()
+        item.setObjectName("sound_item")
+        item.setCursor(Qt.CursorShape.PointingHandCursor)
+        item.setFixedHeight(60)
+        
+        layout = QHBoxLayout(item)
+        layout.setContentsMargins(16, 8, 16, 8)
+        
+        # Category color indicator
+        category_color = COLORS.get(f'category_{sound_data["category"]}', COLORS['accent'])
+        color_indicator = QFrame()
+        color_indicator.setFixedSize(4, 20)
+        color_indicator.setStyleSheet(f"""
+            background-color: {category_color};
+            border-radius: 2px;
+        """)
+        layout.addWidget(color_indicator)
+        
+        # Sound icon
+        icon_label = QLabel("🔊")
+        icon_label.setStyleSheet(f"""
+            font-size: 18px;
+            color: {category_color};
+            margin-left: 4px;
+        """)
+        layout.addWidget(icon_label)
+        
+        # Title
+        title_label = QLabel(sound_data["title"])
+        title_label.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 8px;
+        """)
+        layout.addWidget(title_label, 1)
+        
+        # Duration
+        duration_label = QLabel(sound_data["duration"])
+        duration_label.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            font-size: 12px;
+        """)
+        layout.addWidget(duration_label)
+        
+        # Favorite button
+        fav_btn = QPushButton("★" if sound_data["favorite"] else "☆")
+        fav_btn.setFixedSize(24, 24)
+        fav_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        fav_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {('gold' if sound_data["favorite"] else COLORS['text_secondary'])};
+                border: none;
+                font-size: 16px;
+            }}
+            QPushButton:hover {{
+                color: gold;
+            }}
+        """)
+        fav_btn.clicked.connect(lambda: self._on_sound_action(sound_data["id"], "favorite"))
+        layout.addWidget(fav_btn)
+        
+        # Play button
+        play_btn = QPushButton("▶")
+        play_btn.setFixedSize(30, 30)
+        play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        play_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['accent']};
+                color: {COLORS['text_primary']};
+                border-radius: 15px;
+                border: none;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['accent_gradient_start']};
+            }}
+        """)
+        play_btn.clicked.connect(lambda: self._on_sound_action(sound_data["id"], "play"))
+        layout.addWidget(play_btn)
+        
+        # Menu button (3 dots)
+        menu_btn = QPushButton("⋮")
+        menu_btn.setFixedSize(30, 30)
+        menu_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        menu_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_secondary']};
+                border-radius: 12px;
+                border: none;
+                font-size: 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['card_hover']};
+            }}
+        """)
+        menu_btn.clicked.connect(lambda: self._show_sound_menu(sound_data["id"], menu_btn))
+        layout.addWidget(menu_btn)
+        
+        # Add to list
+        self.sound_list_layout.insertWidget(self.sound_list_layout.count() - 1, item)
+        
+    def _show_sound_menu(self, sound_id, button):
+        """Show context menu for sound"""
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {COLORS['bg_elevated']};
+                border: 1px solid {COLORS['divider']};
+                border-radius: 4px;
+                padding: 4px;
+            }}
+            QMenu::item {{
+                padding: 6px 16px;
+                color: {COLORS['text_primary']};
+            }}
+            QMenu::item:selected {{
+                background-color: {COLORS['card_hover']};
+                color: {COLORS['accent']};
+            }}
+        """)
+        
+        edit_action = QAction("Edit", menu)
+        edit_action.triggered.connect(lambda: self._on_sound_action(sound_id, "edit"))
+        menu.addAction(edit_action)
+        
+        delete_action = QAction("Delete", menu)
+        delete_action.triggered.connect(lambda: self._on_sound_action(sound_id, "delete"))
+        menu.addAction(delete_action)
+        
+        menu.exec(button.mapToGlobal(QPoint(0, button.height())))
+    
+    def _toggle_view(self, is_grid_view):
+        """Toggle between grid and list view"""
+        self.view_stack.setCurrentIndex(0 if is_grid_view else 1)
+    
+    def _change_size(self, size):
+        """Change the size of sound cards in grid view"""
+        self.current_size = size
+        
+        sizes = {
+            "small": (160, 140),
+            "medium": (200, 180),
+            "large": (240, 220)
+        }
+        
+        if size in sizes:
+            # Adjust size of all sound cards in the folder content view
+            for i in range(self.sound_grid.count()):
+                item = self.sound_grid.itemAt(i)
+                if item and item.widget():
+                    card = item.widget()
+                    card.setFixedSize(*sizes[size])
+            
+            # Adjust columns in grid based on size to prevent overflow
+            columns = 4  # Default for small and medium
+            if size == "large":
+                columns = 3
+            
+            # Rearrange items in grid with new column count
+            widgets = []
+            while self.sound_grid.count():
+                item = self.sound_grid.takeAt(0)
+                if item.widget():
+                    widgets.append(item.widget())
+            
+            for i, widget in enumerate(widgets):
+                row = i // columns
+                col = i % columns
+                self.sound_grid.addWidget(widget, row, col)
+    
+    def _sort_sounds(self, sort_by):
+        """Sort sounds according to criteria"""
+        print(f"Sorting sounds by: {sort_by}")
+        
+        # Get a copy of sound data to sort
+        sorted_sounds = self.sounds.copy()
+        
+        if sort_by == "name":
+            sorted_sounds.sort(key=lambda s: s["title"])
+        elif sort_by == "duration":
+            sorted_sounds.sort(key=lambda s: s["duration"])
+        # Default is "recent" (original order)
+        
+        # Clear current grid
+        while self.sound_grid.count():
+            item = self.sound_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+                
+        # Clear current list view (except the stretch at the end)
+        for i in range(self.sound_list_layout.count() - 1, -1, -1):
+            item = self.sound_list_layout.itemAt(i)
+            if item and not isinstance(item, QSpacerItem):
+                widget = item.widget()
+                if widget:
+                    self.sound_list_layout.removeWidget(widget)
+                    widget.deleteLater()
+        
+        # Recreate sound cards and list items in sorted order
+        for i, sound in enumerate(sorted_sounds):
+            self._create_sound_card(i, sound)
+            self._create_sound_list_item(sound)
+            
+    def _on_sound_action(self, sound_id, action):
+        """Handle sound actions"""
+        print(f"Sound {sound_id} action: {action}")
+        # In a real implementation, this would handle playing, editing, etc.
+
+class FavoriteSoundCard(SoundCard):
+    """Modified SoundCard for the favorites view without the favorite button"""
+    def __init__(self, title, category, sound_id="", parent=None):
+        super().__init__(title, category, sound_id, True, parent)
+        
+    def _setup_ui(self):
+        # Set up the main card style
+        self.setStyleSheet(f"""
+            SoundCard {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {COLORS['card_gradient_start']},
+                    stop:1 {COLORS['card_gradient_end']});
+                border-radius: 8px;
+                border: 1px solid {COLORS['divider']};
+            }}
+            SoundCard:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {COLORS['card_hover']},
+                    stop:1 {COLORS['bg_elevated']});
+                border: 1px solid {COLORS['accent']};
+            }}
+        """)
+        
+        # Add shadow effect
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(COLORS['shadow']))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+        
+        # Top section with category, title and menu
+        top_section = QHBoxLayout()
+        
+        # Category indicator
+        category_indicator = QFrame()
+        category_indicator.setFixedSize(4, 20)
+        category_indicator.setStyleSheet(f"""
+            background-color: {COLORS[f'category_{self.category}']};
+            border-radius: 2px;
+        """)
+        top_section.addWidget(category_indicator)
+        
+        # Sound title at top left
+        title_label = QLabel(self.title)
+        title_label.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 4px;
+        """)
+        top_section.addWidget(title_label)
+        
+        top_section.addStretch()
+        
+        # Menu button (3 vertical dots)
+        self.menu_button = QPushButton("⋮")
+        self.menu_button.setFixedSize(24, 24)
+        self.menu_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.menu_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_secondary']};
+                border-radius: 12px;
+                border: none;
+                font-size: 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['card_hover']};
+            }}
+        """)
+        self.menu_button.clicked.connect(self._show_context_menu)
+        top_section.addWidget(self.menu_button)
+        
+        layout.addLayout(top_section)
+        
+        # Waveform placeholder with gradient
+        waveform = QFrame()
+        waveform.setFixedHeight(80)
+        waveform.setStyleSheet(f"""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 {COLORS['bg_secondary']},
+                stop:1 {COLORS['bg_elevated']});
+            border-radius: 4px;
+        """)
+        layout.addWidget(waveform)
+        
+        # Bottom controls
+        controls = QHBoxLayout()
+        
+        # Play button with improved icon
+        play_btn = ModernButton("▶ Play")
+        play_btn.setFixedHeight(32)
+        play_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {COLORS['accent_gradient_start']},
+                    stop:1 {COLORS['accent_gradient_end']});
+                color: {COLORS['text_primary']};
+                border: none;
+                border-radius: 16px;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 4px 12px;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {COLORS['accent']},
+                    stop:1 {COLORS['accent']});
+            }}
+        """)
+        controls.addWidget(play_btn)
+        
+        controls.addStretch()
+        
+        # Hotkey indicator with gradient
+        hotkey_label = QLabel("F1")
+        hotkey_label.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 {COLORS['bg_secondary']},
+                stop:1 {COLORS['bg_elevated']});
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        """)
+        controls.addWidget(hotkey_label)
+        
+        layout.addLayout(controls)
+        layout.addStretch()
+    
+    def _show_context_menu(self):
+        """Show context menu with actions (without favorite option)"""
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {COLORS['bg_elevated']};
+                border: 1px solid {COLORS['divider']};
+                border-radius: 4px;
+                padding: 4px;
+            }}
+            QMenu::item {{
+                padding: 6px 16px;
+                color: {COLORS['text_primary']};
+            }}
+            QMenu::item:selected {{
+                background-color: {COLORS['card_hover']};
+                color: {COLORS['accent']};
+            }}
+        """)
+        
+        edit_action = QAction("Edit", menu)
+        edit_action.triggered.connect(lambda: self.sound_clicked.emit(self.sound_id, "edit"))
+        menu.addAction(edit_action)
+        
+        delete_action = QAction("Delete", menu)
+        delete_action.triggered.connect(lambda: self.sound_clicked.emit(self.sound_id, "delete"))
+        menu.addAction(delete_action)
+        
+        # No favorite/unfavorite option in favorites view
+        
+        menu.exec(self.mapToGlobal(self.menu_button.pos() + QPoint(0, self.menu_button.height())))
 
 class FavouritesView(QFrame):
     """View for favourites sounds"""
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.favorite_sounds = []
         self._setup_ui()
+        self._populate_sample_favorites()
         
     def _setup_ui(self):
         self.setStyleSheet(f"""
             FavouritesView {{
                 background-color: {COLORS['bg_primary']};
+                border: none;
+            }}
+            QFrame#favorite_item:hover, QFrame#favorite_card:hover {{
+                background-color: {COLORS['card_hover']};
+                border: 1px solid {COLORS['accent']};
+            }}
+            QLabel, QPushButton {{
                 border: none;
             }}
         """)
@@ -959,18 +1410,42 @@ class FavouritesView(QFrame):
         
         # View controls
         controls_layout = QHBoxLayout()
-        view_controls = ViewControls()
-        controls_layout.addWidget(view_controls)
+        self.view_controls = ViewControls()
+        # Customize sort options for favorites
+        self.view_controls.sort_combo.clear()
+        self.view_controls.sort_combo.addItems(["Recent", "Name", "Duration"])
+        self.view_controls.grid_view_toggled.connect(self._toggle_view)
+        self.view_controls.size_changed.connect(self._change_size)
+        self.view_controls.sort_changed.connect(self._sort_favorites)
+        controls_layout.addWidget(self.view_controls)
         controls_layout.addStretch()
         layout.addLayout(controls_layout)
         
-        # Content (sound grid)
-        content_area = QScrollArea()
-        content_area.setWidgetResizable(True)
-        content_area.setFrameShape(QFrame.Shape.NoFrame)
-        content_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        content_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        content_area.setStyleSheet("""
+        # Create stacked widget for different views
+        self.view_stack = QStackedWidget()
+        
+        # Grid view for favorites
+        self.grid_view = self._create_grid_view()
+        self.view_stack.addWidget(self.grid_view)
+        
+        # List view for favorites
+        self.list_view = self._create_list_view()
+        self.view_stack.addWidget(self.list_view)
+        
+        # Add the stacked widget to the main layout
+        layout.addWidget(self.view_stack)
+        
+        # Set default view
+        self.view_stack.setCurrentIndex(0)  # Start with grid view
+        
+    def _create_grid_view(self):
+        """Create the grid view for favorite sounds"""
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("""
             QScrollArea {
                 border: none;
                 background: transparent;
@@ -988,41 +1463,313 @@ class FavouritesView(QFrame):
             }
         """)
         
-        content_widget = QWidget()
-        content_layout = QGridLayout(content_widget)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(16)
+        self.grid_content = QWidget()
+        self.favorites_grid = QGridLayout(self.grid_content)
+        self.favorites_grid.setContentsMargins(0, 0, 0, 0)
+        self.favorites_grid.setSpacing(16)
         
-        # Sample favorites
-        sample_sounds = [
-            ("Favorite Sound 1", 1),
-            ("Favorite Sound 2", 2),
-            ("Favorite Sound 3", 3),
-            ("Favorite Sound 4", 4),
-            ("Favorite Sound 5", 1),
-            ("Favorite Sound 6", 2)
+        scroll_area.setWidget(self.grid_content)
+        return scroll_area
+        
+    def _create_list_view(self):
+        """Create the list view for favorite sounds"""
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #404040;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        list_container = QWidget()
+        self.favorites_list_layout = QVBoxLayout(list_container)
+        self.favorites_list_layout.setContentsMargins(0, 0, 0, 0)
+        self.favorites_list_layout.setSpacing(8)
+        self.favorites_list_layout.addStretch()
+        
+        scroll_area.setWidget(list_container)
+        return scroll_area
+    
+    def _populate_sample_favorites(self):
+        """Add sample favorite sounds for visualization"""
+        # Sample favorite sounds
+        sample_favorites = [
+            {"id": "fav1", "title": "Favorite Sound 1", "category": 1, "duration": "0:20", "favorite": True},
+            {"id": "fav2", "title": "Favorite Sound 2", "category": 2, "duration": "0:15", "favorite": True},
+            {"id": "fav3", "title": "Favorite Sound 3", "category": 3, "duration": "0:30", "favorite": True},
+            {"id": "fav4", "title": "Favorite Sound 4", "category": 4, "duration": "0:10", "favorite": True},
+            {"id": "fav5", "title": "Favorite Sound 5", "category": 1, "duration": "0:25", "favorite": True},
+            {"id": "fav6", "title": "Favorite Sound 6", "category": 2, "duration": "0:18", "favorite": True}
         ]
         
-        # Create a proper grid layout
-        for i, (title, category) in enumerate(sample_sounds):
-            row = i // 4  # 4 cards per row
-            col = i % 4
-            card = SoundCard(title, category)
-            content_layout.addWidget(card, row, col)
+        # Store favorite sound data
+        self.favorite_sounds = sample_favorites
         
-        content_area.setWidget(content_widget)
-        layout.addWidget(content_area)
+        # Create favorite sound cards for grid view and list items for list view
+        for i, sound in enumerate(self.favorite_sounds):
+            self._create_favorite_card(i, sound)
+            self._create_favorite_list_item(sound)
+    
+    def _create_favorite_card(self, index, sound_data):
+        """Create a favorite sound card widget and add it to the grid"""
+        columns = 4  # Default column count
+        row = index // columns
+        col = index % columns
+        
+        # Create the favorite sound card
+        card = FavoriteSoundCard(sound_data["title"], sound_data["category"], sound_data["id"])
+        card.setObjectName("favorite_card")  # Set object name for styling
+        card.sound_clicked.connect(self._on_favorite_action)
+        
+        # Add to grid
+        self.favorites_grid.addWidget(card, row, col)
+    
+    def _create_favorite_list_item(self, sound_data):
+        """Create a list item for a favorite sound in list view"""
+        item = QFrame()
+        item.setObjectName("favorite_item")
+        item.setCursor(Qt.CursorShape.PointingHandCursor)
+        item.setFixedHeight(60)
+        
+        layout = QHBoxLayout(item)
+        layout.setContentsMargins(16, 8, 16, 8)
+        
+        # Category color indicator
+        category_color = COLORS.get(f'category_{sound_data["category"]}', COLORS['accent'])
+        color_indicator = QFrame()
+        color_indicator.setFixedSize(4, 20)
+        color_indicator.setStyleSheet(f"""
+            background-color: {category_color};
+            border-radius: 2px;
+        """)
+        layout.addWidget(color_indicator)
+        
+        # Sound icon
+        icon_label = QLabel("🔊")
+        icon_label.setStyleSheet(f"""
+            font-size: 18px;
+            color: {category_color};
+            margin-left: 4px;
+        """)
+        layout.addWidget(icon_label)
+        
+        # Title
+        title_label = QLabel(sound_data["title"])
+        title_label.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 8px;
+        """)
+        layout.addWidget(title_label, 1)
+        
+        # Duration
+        duration_label = QLabel(sound_data["duration"])
+        duration_label.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            font-size: 12px;
+        """)
+        layout.addWidget(duration_label)
+        
+        # Play button
+        play_btn = QPushButton("▶")
+        play_btn.setFixedSize(30, 30)
+        play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        play_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['accent']};
+                color: {COLORS['text_primary']};
+                border-radius: 15px;
+                border: none;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['accent_gradient_start']};
+            }}
+        """)
+        play_btn.clicked.connect(lambda: self._on_favorite_action(sound_data["id"], "play"))
+        layout.addWidget(play_btn)
+        
+        # Menu button (3 dots)
+        menu_btn = QPushButton("⋮")
+        menu_btn.setFixedSize(30, 30)
+        menu_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        menu_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_secondary']};
+                border-radius: 12px;
+                border: none;
+                font-size: 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['card_hover']};
+            }}
+        """)
+        menu_btn.clicked.connect(lambda: self._show_favorite_menu(sound_data["id"], menu_btn))
+        layout.addWidget(menu_btn)
+        
+        # Add to list
+        self.favorites_list_layout.insertWidget(self.favorites_list_layout.count() - 1, item)
+        
+    def _show_favorite_menu(self, sound_id, button):
+        """Show context menu for favorite sound"""
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {COLORS['bg_elevated']};
+                border: 1px solid {COLORS['divider']};
+                border-radius: 4px;
+                padding: 4px;
+            }}
+            QMenu::item {{
+                padding: 6px 16px;
+                color: {COLORS['text_primary']};
+            }}
+            QMenu::item:selected {{
+                background-color: {COLORS['card_hover']};
+                color: {COLORS['accent']};
+            }}
+        """)
+        
+        edit_action = QAction("Edit", menu)
+        edit_action.triggered.connect(lambda: self._on_favorite_action(sound_id, "edit"))
+        menu.addAction(edit_action)
+        
+        remove_action = QAction("Remove from Favorites", menu)
+        remove_action.triggered.connect(lambda: self._on_favorite_action(sound_id, "unfavorite"))
+        menu.addAction(remove_action)
+        
+        delete_action = QAction("Delete", menu)
+        delete_action.triggered.connect(lambda: self._on_favorite_action(sound_id, "delete"))
+        menu.addAction(delete_action)
+        
+        menu.exec(button.mapToGlobal(QPoint(0, button.height())))
+    
+    def _toggle_view(self, is_grid_view):
+        """Toggle between grid and list view"""
+        self.view_stack.setCurrentIndex(0 if is_grid_view else 1)
+    
+    def _change_size(self, size):
+        """Change the size of favorite sound cards in grid view"""
+        print(f"Changed favorites size to: {size}")
+        self.current_size = size
+        
+        sizes = {
+            "small": (160, 140),
+            "medium": (200, 180),
+            "large": (240, 220)
+        }
+        
+        if size in sizes:
+            # Adjust size of all favorite sound cards
+            for i in range(self.favorites_grid.count()):
+                item = self.favorites_grid.itemAt(i)
+                if item and item.widget():
+                    card = item.widget()
+                    card.setFixedSize(*sizes[size])
+            
+            # Adjust columns in grid based on size to prevent overflow
+            columns = 4  # Default for small and medium
+            if size == "large":
+                columns = 3
+            
+            # Rearrange items in grid with new column count
+            widgets = []
+            while self.favorites_grid.count():
+                item = self.favorites_grid.takeAt(0)
+                if item.widget():
+                    widgets.append(item.widget())
+            
+            for i, widget in enumerate(widgets):
+                if i < len(widgets):  # Safety check
+                    row = i // columns
+                    col = i % columns
+                    self.favorites_grid.addWidget(widget, row, col)
+    
+    def _sort_favorites(self, sort_by):
+        """Sort favorite sounds according to criteria"""
+        print(f"Sorting favorites by: {sort_by}")
+        self.current_sort = sort_by
+        
+        # Get a copy of favorite sound data to sort
+        sorted_favorites = self.favorite_sounds.copy()
+        
+        if sort_by == "name":
+            sorted_favorites.sort(key=lambda s: s["title"].lower())
+        elif sort_by == "duration":
+            sorted_favorites.sort(key=lambda s: s["duration"])
+        # Default is "recent" (original order)
+        
+        # Update the favorite_sounds with the sorted version
+        self.favorite_sounds = sorted_favorites
+        
+        # Clear current grid
+        while self.favorites_grid.count():
+            item = self.favorites_grid.takeAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
+                
+        # Clear current list view (except the stretch at the end)
+        for i in range(self.favorites_list_layout.count() - 1, -1, -1):
+            item = self.favorites_list_layout.itemAt(i)
+            if item and not isinstance(item, QSpacerItem):
+                widget = item.widget()
+                if widget:
+                    self.favorites_list_layout.removeWidget(widget)
+                    widget.deleteLater()
+        
+        # Recreate favorite sound cards and list items in sorted order
+        for i, sound in enumerate(sorted_favorites):
+            self._create_favorite_card(i, sound)
+            self._create_favorite_list_item(sound)
+    
+    def _on_favorite_action(self, sound_id, action):
+        """Handle favorite sound actions"""
+        print(f"Favorite sound {sound_id}: {action}")
+        # In a real implementation, this would handle playing, editing, etc.
 
 class FolderView(QFrame):
     """Folder view for organizing sounds"""
     folder_selected = pyqtSignal(str)  # Emits folder_id when selected
+    folder_clicked = pyqtSignal(str, str)  # Emits folder_id and action
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.current_view = "grid"  # Default view
-        self.current_size = "medium"  # Default size
-        self.folders = {}  # Dictionary to store folder data
+        self.setObjectName("folder_view")
+        
+        # Store folder data
+        self.folders = {}
+        
+        # Current folder tracking
+        self.current_folder_id = None
+        self.parent_folders = {}  # Maps folder_id to parent_id
+        
+        # Default folder attributes
+        self.folder_name = "Folders"
+        self.sound_count = 0
+        self.folder_id = "root"
+        
+        # Setup UI
         self._setup_ui()
+        
+        # Populate with sample data
         self._populate_sample_folders()
         
     def _setup_ui(self):
@@ -1031,13 +1778,25 @@ class FolderView(QFrame):
                 background-color: {COLORS['bg_primary']};
                 border: none;
             }}
+            QFrame#folder_item:hover, QFrame#folder_card:hover {{
+                background-color: {COLORS['folder_hover']};
+                border: 1px solid {COLORS['accent']};
+            }}
+            QFrame#folder_item, QFrame#folder_card {{
+                background-color: {COLORS['folder_bg']};
+                border-radius: 8px;
+                border: 1px solid {COLORS['divider']};
+            }}
+            QLabel, QPushButton {{
+                border: none;
+            }}
         """)
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
         
-        # Header with title and add button
+        # Header with title and add folder button
         header = QHBoxLayout()
         
         title = QLabel("Folders")
@@ -1050,7 +1809,12 @@ class FolderView(QFrame):
         
         header.addStretch()
         
-        add_folder_btn = ModernButton("+ New Folder", is_primary=True)
+        # Search bar
+        search_bar = SearchBar()
+        header.addWidget(search_bar)
+        
+        # Add folder button
+        add_folder_btn = ModernButton("+ Add Folder", is_primary=True)
         header.addWidget(add_folder_btn)
         
         layout.addLayout(header)
@@ -1058,6 +1822,8 @@ class FolderView(QFrame):
         # View controls
         controls_layout = QHBoxLayout()
         self.view_controls = ViewControls()
+        self.view_controls.sort_combo.clear()
+        self.view_controls.sort_combo.addItems(["Default", "Name", "Sound Count"])
         self.view_controls.grid_view_toggled.connect(self._toggle_view)
         self.view_controls.size_changed.connect(self._change_size)
         self.view_controls.sort_changed.connect(self._sort_folders)
@@ -1065,197 +1831,230 @@ class FolderView(QFrame):
         controls_layout.addStretch()
         layout.addLayout(controls_layout)
         
-        # Stacked widget to switch between list and grid views
+        # Create stacked widget for different views
         self.view_stack = QStackedWidget()
         
-        # List view
-        self.list_container = QScrollArea()
-        self.list_container.setWidgetResizable(True)
-        self.list_container.setFrameShape(QFrame.Shape.NoFrame)
-        self.list_container.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.list_container.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.list_container.setStyleSheet(f"""
-            QScrollArea {{
-                border: none;
-                background: transparent;
-            }}
-            QScrollBar:vertical {{
-                width: 8px;
-                background: transparent;
-            }}
-            QScrollBar::handle:vertical {{
-                background: #404040;
-                border-radius: 4px;
-            }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                height: 0px;
-            }}
-        """)
+        # Grid view for folders
+        self.grid_view = self._create_grid_view()
+        self.view_stack.addWidget(self.grid_view)
         
-        self.list_content = QWidget()
-        self.list_layout = QVBoxLayout(self.list_content)
-        self.list_layout.setContentsMargins(0, 0, 0, 0)
-        self.list_layout.setSpacing(10)
+        # List view for folders
+        self.list_view = self._create_list_view()
+        self.view_stack.addWidget(self.list_view)
         
-        self.list_container.setWidget(self.list_content)
-        
-        # Grid view
-        self.grid_container = QScrollArea()
-        self.grid_container.setWidgetResizable(True)
-        self.grid_container.setFrameShape(QFrame.Shape.NoFrame)
-        self.grid_container.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.grid_container.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.grid_container.setStyleSheet(f"""
-            QScrollArea {{
-                border: none;
-                background: transparent;
-            }}
-            QScrollBar:vertical {{
-                width: 8px;
-                background: transparent;
-            }}
-            QScrollBar::handle:vertical {{
-                background: #404040;
-                border-radius: 4px;
-            }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                height: 0px;
-            }}
-        """)
-        
-        self.grid_content = QWidget()
-        self.grid_layout = QGridLayout(self.grid_content)
-        self.grid_layout.setContentsMargins(0, 0, 0, 0)
-        self.grid_layout.setSpacing(16)
-        
-        self.grid_container.setWidget(self.grid_content)
-        
-        # Add views to stack
-        self.view_stack.addWidget(self.grid_container)  # Index 0 = Grid view
-        self.view_stack.addWidget(self.list_container)  # Index 1 = List view
-        
+        # Add the stacked widget to the main layout
         layout.addWidget(self.view_stack)
+        
+        # Set default view
+        self.view_stack.setCurrentIndex(0)  # Start with grid view
+        
+    def _create_grid_view(self):
+        """Create the grid view for folders"""
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #404040;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        self.content_widget = QWidget()
+        self.folder_grid = QGridLayout(self.content_widget)
+        self.folder_grid.setContentsMargins(0, 0, 0, 0)
+        self.folder_grid.setSpacing(16)
+        
+        scroll_area.setWidget(self.content_widget)
+        return scroll_area
+        
+    def _create_list_view(self):
+        """Create the list view for folders"""
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 8px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #404040;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        list_container = QWidget()
+        self.folder_list_layout = QVBoxLayout(list_container)
+        self.folder_list_layout.setContentsMargins(0, 0, 0, 0)
+        self.folder_list_layout.setSpacing(8)
+        self.folder_list_layout.addStretch()
+        
+        scroll_area.setWidget(list_container)
+        return scroll_area
     
     def _populate_sample_folders(self):
         """Add sample folders for visualization"""
-        # Clear existing folders
-        self._clear_views()
-        
-        # Sample folders
+        # Just visual samples for UI demonstration
         sample_folders = [
             {"id": "folder1", "name": "Sound Effects", "count": 12},
-            {"id": "folder2", "name": "Meme Sounds", "count": 8},
-            {"id": "folder3", "name": "Music Clips", "count": 5},
-            {"id": "folder4", "name": "Custom Recordings", "count": 3},
-            {"id": "folder5", "name": "Voice Mods", "count": 7},
-            {"id": "folder6", "name": "Animal Sounds", "count": 9},
-            {"id": "folder7", "name": "Instruments", "count": 15},
-            {"id": "folder8", "name": "Nature Sounds", "count": 11},
-            {"id": "folder9", "name": "Game Sounds", "count": 14},
-            {"id": "folder10", "name": "Movie Quotes", "count": 6},
-            {"id": "folder11", "name": "Cartoon Effects", "count": 8}
+            {"id": "folder2", "name": "Music Clips", "count": 8},
+            {"id": "folder3", "name": "Voice Lines", "count": 15},
+            {"id": "folder4", "name": "Notifications", "count": 6},
+            {"id": "folder5", "name": "Custom Sounds", "count": 9}
         ]
         
-        # Add folders to both views
-        for folder in sample_folders:
-            self.add_folder(folder["id"], folder["name"], folder["count"])
+        # Store folder data and create folder cards
+        for i, folder in enumerate(sample_folders):
+            self.folders[folder["id"]] = folder
+            self._create_folder_card(i, folder)
+            self._create_folder_list_item(folder)
+            
+    def _create_folder_card(self, index, folder_data):
+        """Create a folder card widget and add it to the grid"""
+        row = index // 4  # 4 folders per row
+        col = index % 4
         
-        # Add stretch to list view to push items to top
-        self.list_layout.addStretch()
-    
-    def _clear_views(self):
-        """Clear both list and grid views"""
-        # Clear list view
-        for i in reversed(range(self.list_layout.count())):
-            item = self.list_layout.itemAt(i)
-            if item.widget():
-                item.widget().deleteLater()
-        
-        # Clear grid view
-        for i in reversed(range(self.grid_layout.count())):
-            item = self.grid_layout.itemAt(i)
-            if item.widget():
-                item.widget().deleteLater()
-        
-        # Clear folders dictionary
-        self.folders = {}
-    
-    def add_folder(self, folder_id, name, sound_count=0):
-        """Add a folder to both views"""
-        # Store folder data
-        self.folders[folder_id] = {
-            "name": name,
-            "count": sound_count
-        }
-        
-        # Create list view item
-        list_item = self._create_folder_list_item(name, sound_count, folder_id)
-        self.list_layout.addWidget(list_item)
-        
-        # Create grid view item
-        grid_item = self._create_folder_card(name, folder_id, sound_count)
-        
-        # Calculate position in grid (4 items per row)
-        folder_index = len(self.folders) - 1
-        row = folder_index // 4
-        col = folder_index % 4
-        
-        self.grid_layout.addWidget(grid_item, row, col)
-    
-    def _create_folder_list_item(self, name, sound_count, folder_id):
-        """Create a folder item widget for list view"""
-        folder_frame = QFrame()
-        folder_frame.setObjectName(f"folder_list_{folder_id}")
-        folder_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLORS['folder_bg']};
-                border-radius: 8px;
-            }}
-            QFrame:hover {{
-                background-color: {COLORS['folder_hover']};
-            }}
-        """)
-        folder_frame.setCursor(Qt.CursorShape.PointingHandCursor)
-        folder_frame.setFixedHeight(70)
-        folder_frame.mousePressEvent = lambda e, fid=folder_id: self._on_folder_clicked(fid)
+        # Create the folder card
+        card = QFrame()
+        card.setFixedSize(200, 180)
+        card.setObjectName(f"folder_card")  # Set common object name for styling
+        card.setCursor(Qt.CursorShape.PointingHandCursor)
         
         # Add shadow effect
-        shadow = QGraphicsDropShadowEffect(folder_frame)
-        shadow.setBlurRadius(10)
+        shadow = QGraphicsDropShadowEffect(card)
+        shadow.setBlurRadius(12)
         shadow.setColor(QColor(COLORS['shadow']))
         shadow.setOffset(0, 2)
-        folder_frame.setGraphicsEffect(shadow)
+        card.setGraphicsEffect(shadow)
         
-        folder_layout = QHBoxLayout(folder_frame)
+        # Card layout
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(10)
+        
+        # Top section with folder icon and menu
+        top_section = QHBoxLayout()
         
         # Folder icon
         folder_icon = QLabel("📁")
         folder_icon.setStyleSheet(f"""
-            font-size: 24px;
+            font-size: 28px;
             color: {COLORS['folder_icon']};
         """)
-        folder_layout.addWidget(folder_icon)
+        top_section.addWidget(folder_icon)
         
-        # Folder info
-        folder_info = QVBoxLayout()
+        top_section.addStretch()
         
-        folder_name = QLabel(name)
-        folder_name.setStyleSheet(f"""
+        # Menu button (3 vertical dots)
+        menu_button = QPushButton("⋮")
+        menu_button.setFixedSize(24, 24)
+        menu_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        menu_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_secondary']};
+                border-radius: 12px;
+                border: none;
+                font-size: 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['card_hover']};
+            }}
+        """)
+        # Connect menu button to show context menu
+        menu_button.clicked.connect(lambda: self._show_context_menu(folder_data['id'], menu_button))
+        top_section.addWidget(menu_button)
+        
+        card_layout.addLayout(top_section)
+        
+        # Folder name
+        name_label = QLabel(folder_data['name'])
+        name_label.setStyleSheet(f"""
             color: {COLORS['text_primary']};
             font-size: 16px;
             font-weight: bold;
         """)
-        folder_info.addWidget(folder_name)
+        name_label.setWordWrap(True)
+        name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(name_label)
         
-        folder_count = QLabel(f"{sound_count} sounds")
-        folder_count.setStyleSheet(f"""
+        card_layout.addStretch()
+        
+        # Sound count
+        count_label = QLabel(f"{folder_data['count']} sounds")
+        count_label.setStyleSheet(f"""
+            color: {COLORS['text_secondary']};
+            font-size: 13px;
+        """)
+        count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(count_label)
+        
+        # Connect card click to emit folder selected signal
+        card.mousePressEvent = lambda event: self._on_folder_click(event, folder_data['id'], menu_button)
+        
+        # Add to grid
+        self.folder_grid.addWidget(card, row, col)
+        
+    def _create_folder_list_item(self, folder_data):
+        """Create a list item for a folder in list view"""
+        item = QFrame()
+        item.setObjectName("folder_item")  # Set object name for styling
+        item.setCursor(Qt.CursorShape.PointingHandCursor)
+        item.setFixedHeight(60)
+        
+        layout = QHBoxLayout(item)
+        layout.setContentsMargins(16, 8, 16, 8)
+        
+        # Folder icon
+        folder_icon = QLabel("📁")
+        folder_icon.setStyleSheet(f"""
+            font-size: 20px;
+            color: {COLORS['folder_icon']};
+        """)
+        layout.addWidget(folder_icon)
+        
+        # Folder name with bold formatting
+        name_label = QLabel(folder_data['name'])
+        name_label.setStyleSheet(f"""
+            color: {COLORS['text_primary']};
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 8px;
+        """)
+        layout.addWidget(name_label, 1)  # 1 is the stretch factor
+        
+        # Sound count
+        count_label = QLabel(f"{folder_data['count']} sounds")
+        count_label.setStyleSheet(f"""
             color: {COLORS['text_secondary']};
             font-size: 12px;
+            margin-right: 12px;
         """)
-        folder_info.addWidget(folder_count)
-        
-        folder_layout.addLayout(folder_info)
-        folder_layout.addStretch()
+        layout.addWidget(count_label)
         
         # Menu button (3 dots)
         menu_btn = QPushButton("⋮")
@@ -1274,192 +2073,99 @@ class FolderView(QFrame):
                 background-color: {COLORS['card_hover']};
             }}
         """)
-        menu_btn.clicked.connect(lambda: self._show_folder_menu(folder_id, menu_btn))
-        folder_layout.addWidget(menu_btn)
+        menu_btn.clicked.connect(lambda: self._show_context_menu(folder_data['id'], menu_btn))
+        layout.addWidget(menu_btn)
         
-        # Action buttons
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(8)
+        # Connect click to emit folder signals
+        item.mousePressEvent = lambda event: self._on_folder_click(event, folder_data['id'], menu_btn)
         
-        edit_btn = ModernButton("Edit")
-        edit_btn.setFixedSize(60, 30)
-        edit_btn.clicked.connect(lambda: self._on_folder_action(folder_id, "edit"))
-        actions_layout.addWidget(edit_btn)
-        
-        play_all_btn = ModernButton("Play All")
-        play_all_btn.setFixedSize(80, 30)
-        play_all_btn.clicked.connect(lambda: self._on_folder_action(folder_id, "play_all"))
-        actions_layout.addWidget(play_all_btn)
-        
-        folder_layout.addLayout(actions_layout)
-        
-        return folder_frame
+        # Add to list
+        self.folder_list_layout.insertWidget(self.folder_list_layout.count() - 1, item)  # Insert before the stretch
     
-    def _create_folder_card(self, name, folder_id, sound_count):
-        """Create a folder card for grid view"""
-        card = FolderCard(name, folder_id, sound_count)
-        card.folder_clicked.connect(lambda fid, action: self._on_folder_action(fid, action))
-        return card
-    
-    def _on_folder_clicked(self, folder_id):
-        """Handle folder selection"""
-        self.folder_selected.emit(folder_id)
-    
-    def _show_folder_menu(self, folder_id, button):
-        """Show context menu for folder"""
-        menu = QMenu(self)
-        menu.setStyleSheet(f"""
-            QMenu {{
-                background-color: {COLORS['bg_elevated']};
-                border: 1px solid {COLORS['divider']};
-                border-radius: 4px;
-                padding: 4px;
-            }}
-            QMenu::item {{
-                padding: 6px 16px;
-                color: {COLORS['text_primary']};
-            }}
-            QMenu::item:selected {{
-                background-color: {COLORS['card_hover']};
-                color: {COLORS['accent']};
-            }}
-        """)
-        
-        edit_action = QAction("Edit", menu)
-        edit_action.triggered.connect(lambda: self._on_folder_action(folder_id, "edit"))
-        menu.addAction(edit_action)
-        
-        delete_action = QAction("Delete", menu)
-        delete_action.triggered.connect(lambda: self._on_folder_action(folder_id, "delete"))
-        menu.addAction(delete_action)
-        
-        menu.exec(button.mapToGlobal(QPoint(0, button.height())))
-    
-    def _on_folder_action(self, folder_id, action):
-        """Handle folder actions"""
-        if action == "open":
-            self.folder_selected.emit(folder_id)
-        elif action == "edit":
-            # TODO: Implement folder editing
-            print(f"Edit folder {folder_id}")
-        elif action == "delete":
-            # TODO: Implement folder deletion
-            print(f"Delete folder {folder_id}")
-        elif action == "play_all":
-            # TODO: Implement play all sounds in folder
-            print(f"Play all sounds in folder {folder_id}")
+    def _on_folder_click(self, event, folder_id, menu_button):
+        """Handle folder click"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Ignore clicks on the menu button
+            if not menu_button.geometry().contains(event.pos()):
+                self.folder_clicked.emit(folder_id, "open")
+                self.folder_selected.emit(folder_id)
+        # Call parent class implementation
+        QFrame.mousePressEvent(self, event)
     
     def _toggle_view(self, is_grid_view):
-        """Toggle between grid and list views"""
-        self.current_view = "grid" if is_grid_view else "list"
+        """Toggle between grid and list view"""
         self.view_stack.setCurrentIndex(0 if is_grid_view else 1)
     
     def _change_size(self, size):
-        """Change size of cards"""
+        """Change the size of folder cards in grid view"""
         self.current_size = size
-        # TODO: Implement size changes for cards
+        
+        sizes = {
+            "small": (160, 140),
+            "medium": (200, 180),
+            "large": (240, 220)
+        }
+        
+        if size in sizes:
+            # Adjust size of all folder cards
+            for i in range(self.folder_grid.count()):
+                item = self.folder_grid.itemAt(i)
+                if item and item.widget():
+                    card = item.widget()
+                    card.setFixedSize(*sizes[size])
+            
+            # Adjust columns in grid based on size to prevent overflow
+            columns = 4  # Default for small and medium
+            if size == "large":
+                columns = 3
+            
+            # Rearrange items in grid with new column count
+            widgets = []
+            while self.folder_grid.count():
+                item = self.folder_grid.takeAt(0)
+                if item.widget():
+                    widgets.append(item.widget())
+            
+            for i, widget in enumerate(widgets):
+                row = i // columns
+                col = i % columns
+                self.folder_grid.addWidget(widget, row, col)
     
     def _sort_folders(self, sort_by):
         """Sort folders according to criteria"""
-        # TODO: Implement folder sorting
+        print(f"Sorting folders by: {sort_by}")
+        
+        # Get folder data and sort it
+        folder_list = list(self.folders.values())
+        
+        if sort_by == "name":
+            folder_list.sort(key=lambda f: f["name"])
+        elif sort_by == "sound_count":
+            folder_list.sort(key=lambda f: f["count"], reverse=True)
+        # Default is to sort by ID (original order)
+        
+        # Clear current grid
+        while self.folder_grid.count():
+            item = self.folder_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+                
+        # Clear current list view (except the stretch at the end)
+        for i in range(self.folder_list_layout.count() - 1, -1, -1):
+            item = self.folder_list_layout.itemAt(i)
+            if item and not isinstance(item, QSpacerItem):
+                widget = item.widget()
+                if widget:
+                    self.folder_list_layout.removeWidget(widget)
+                    widget.deleteLater()
+        
+        # Recreate folder cards and list items in sorted order
+        for i, folder in enumerate(folder_list):
+            self._create_folder_card(i, folder)
+            self._create_folder_list_item(folder)
 
-class FolderCard(QFrame):
-    """Card-style view for folders in grid view"""
-    folder_clicked = pyqtSignal(str, str)  # Emits folder_id and action
-    
-    def __init__(self, name, folder_id, sound_count=0, parent=None):
-        super().__init__(parent)
-        self.folder_name = name
-        self.folder_id = folder_id
-        self.sound_count = sound_count
-        self._setup_ui()
-    
-    def _setup_ui(self):
-        self.setFixedSize(200, 180)
-        self.setStyleSheet(f"""
-            FolderCard {{
-                background-color: {COLORS['folder_bg']};
-                border-radius: 8px;
-                border: 1px solid {COLORS['divider']};
-            }}
-            FolderCard:hover {{
-                background-color: {COLORS['folder_hover']};
-                border: 1px solid {COLORS['accent']};
-            }}
-        """)
-        
-        # Add shadow effect
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(12)
-        shadow.setColor(QColor(COLORS['shadow']))
-        shadow.setOffset(0, 2)
-        self.setGraphicsEffect(shadow)
-        
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
-        
-        # Top section with folder icon and menu
-        top_section = QHBoxLayout()
-        
-        # Folder icon
-        folder_icon = QLabel("📁")
-        folder_icon.setStyleSheet(f"""
-            font-size: 28px;
-            color: {COLORS['folder_icon']};
-        """)
-        top_section.addWidget(folder_icon)
-        
-        top_section.addStretch()
-        
-        # Menu button (3 vertical dots)
-        self.menu_button = QPushButton("⋮")
-        self.menu_button.setFixedSize(24, 24)
-        self.menu_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.menu_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {COLORS['text_secondary']};
-                border-radius: 12px;
-                border: none;
-                font-size: 16px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['card_hover']};
-            }}
-        """)
-        self.menu_button.clicked.connect(self._show_context_menu)
-        top_section.addWidget(self.menu_button)
-        
-        layout.addLayout(top_section)
-        
-        # Folder name
-        self.name_label = QLabel(self.folder_name)
-        self.name_label.setStyleSheet(f"""
-            color: {COLORS['text_primary']};
-            font-size: 16px;
-            font-weight: bold;
-        """)
-        self.name_label.setWordWrap(True)
-        self.name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.name_label)
-        
-        layout.addStretch()
-        
-        # Sound count
-        self.count_label = QLabel(f"{self.sound_count} sounds")
-        self.count_label.setStyleSheet(f"""
-            color: {COLORS['text_secondary']};
-            font-size: 13px;
-        """)
-        self.count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.count_label)
-        
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-    
-    def _show_context_menu(self):
-        """Show context menu with actions"""
+    def _show_context_menu(self, folder_id, menu_button):
+        """Show context menu with actions for a specific folder"""
         menu = QMenu(self)
         menu.setStyleSheet(f"""
             QMenu {{
@@ -1479,22 +2185,14 @@ class FolderCard(QFrame):
         """)
         
         edit_action = QAction("Edit", menu)
-        edit_action.triggered.connect(lambda: self.folder_clicked.emit(self.folder_id, "edit"))
+        edit_action.triggered.connect(lambda: self.folder_clicked.emit(folder_id, "edit"))
         menu.addAction(edit_action)
         
         delete_action = QAction("Delete", menu)
-        delete_action.triggered.connect(lambda: self.folder_clicked.emit(self.folder_id, "delete"))
+        delete_action.triggered.connect(lambda: self.folder_clicked.emit(folder_id, "delete"))
         menu.addAction(delete_action)
         
-        menu.exec(self.mapToGlobal(self.menu_button.pos() + QPoint(0, self.menu_button.height())))
-    
-    def mousePressEvent(self, event):
-        """Handle click event (open folder)"""
-        if event.button() == Qt.MouseButton.LeftButton:
-            # Ignore clicks on the menu button
-            if not self.menu_button.geometry().contains(event.pos()):
-                self.folder_clicked.emit(self.folder_id, "open")
-        super().mousePressEvent(event)
+        menu.exec(self.mapToGlobal(menu_button.pos() + QPoint(0, menu_button.height())))
 
 class FolderContentView(QFrame):
     """View for displaying sounds in a selected folder"""
@@ -1503,7 +2201,11 @@ class FolderContentView(QFrame):
         self.folder_name = folder_name
         self.current_view = "grid"  # Default to grid view
         self.current_size = "medium"  # Default size
+        self.sounds = []  # Initialize sounds list
         self._setup_ui()
+        
+        # Populate with some sample sounds in this folder
+        self._populate_sample_sounds()
         
     def _setup_ui(self):
         self.setStyleSheet(f"""
@@ -1779,13 +2481,13 @@ class FolderContentView(QFrame):
             QPushButton {{
                 background-color: transparent;
                 color: {COLORS['text_secondary']};
-                border-radius: 15px;
+                border-radius: 12px;
                 border: none;
                 font-size: 16px;
                 font-weight: bold;
             }}
             QPushButton:hover {{
-                background-color: {COLORS['bg_secondary']};
+                background-color: {COLORS['card_hover']};
             }}
         """)
         menu_btn.clicked.connect(lambda: self._show_sound_menu(sound_id, menu_btn))
@@ -1835,12 +2537,95 @@ class FolderContentView(QFrame):
     
     def _sort_sounds(self, sort_by):
         """Sort sounds according to criteria"""
-        # TODO: Implement sound sorting
-    
+        print(f"Sorting folder content sounds by: {sort_by}")
+        self.current_sort = sort_by
+        
+        # Get a copy of sound data to sort
+        sorted_sounds = self.sounds.copy() if hasattr(self, 'sounds') else []
+        
+        if sort_by == "name":
+            sorted_sounds.sort(key=lambda s: s["title"].lower())
+        elif sort_by == "duration":
+            sorted_sounds.sort(key=lambda s: s["duration"])
+        # Default is "recent" (original order)
+        
+        # Update the sounds list with the sorted version
+        self.sounds = sorted_sounds
+        
+        # Clear current grid
+        while self.sound_grid.count():
+            item = self.sound_grid.takeAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
+                
+        # Clear current list view (except the stretch at the end)
+        for i in range(self.sound_list_layout.count() - 1, -1, -1):
+            item = self.sound_list_layout.itemAt(i)
+            if item and not isinstance(item, QSpacerItem):
+                widget = item.widget()
+                if widget:
+                    self.sound_list_layout.removeWidget(widget)
+                    widget.deleteLater()
+        
+        # Recreate sound cards and list items in sorted order
+        for i, sound in enumerate(sorted_sounds):
+            self._create_sound_card(i, sound)
+            self._create_sound_list_item(sound["id"], sound["title"], sound["category"], sound.get("is_favorite", False))
+
+    def _populate_sample_sounds(self):
+        """Add sample sounds to the folder for visualization"""
+        # Sample sounds in this folder
+        sample_sounds = [
+            {"id": "f1s1", "title": "Folder Sound 1", "category": 1, "duration": "0:18", "is_favorite": False},
+            {"id": "f1s2", "title": "Folder Sound 2", "category": 2, "duration": "0:12", "is_favorite": True},
+            {"id": "f1s3", "title": "Folder Sound 3", "category": 3, "duration": "0:25", "is_favorite": False},
+            {"id": "f1s4", "title": "Folder Sound 4", "category": 1, "duration": "0:08", "is_favorite": False},
+            {"id": "f1s5", "title": "Folder Sound 5", "category": 4, "duration": "0:22", "is_favorite": True}
+        ]
+        
+        # Store sound data
+        self.sounds = sample_sounds
+        
+        # Create sound cards for grid view and list items for list view
+        for i, sound in enumerate(self.sounds):
+            self._create_sound_card(i, sound)
+            self._create_sound_list_item(sound["id"], sound["title"], sound["category"], sound.get("is_favorite", False))
+
+    def _create_sound_card(self, index, sound_data):
+        """Create a sound card widget and add it to the grid"""
+        columns = 4  # Default column count
+        if self.current_size == "large":
+            columns = 3
+        
+        row = index // columns
+        col = index % columns
+        
+        # Create the sound card
+        card = SoundCard(
+            sound_data["title"], 
+            sound_data["category"], 
+            sound_data["id"], 
+            sound_data.get("is_favorite", False)
+        )
+        card.setObjectName("sound_card")  # Set object name for styling
+        card.sound_clicked.connect(self._on_sound_action)
+        
+        # Apply current size
+        sizes = {
+            "small": (160, 140),
+            "medium": (200, 180),
+            "large": (240, 220)
+        }
+        if self.current_size in sizes:
+            card.setFixedSize(*sizes[self.current_size])
+        
+        # Add to grid
+        self.sound_grid.addWidget(card, row, col)
+
     def _on_sound_action(self, sound_id, action):
         """Handle sound actions"""
-        # TODO: Implement sound actions
         print(f"Sound {sound_id} action: {action}")
+        # TODO: Implement sound actions
 
 class MainWindow(QMainWindow):
     """Main application window"""
@@ -2000,4 +2785,4 @@ class MainWindow(QMainWindow):
         
         # Add status bar widgets
         status_bar.addWidget(QLabel("4 sounds loaded"))
-        status_bar.addPermanentWidget(QLabel("Version 0.1.0"))
+        status_bar.addPermanentWidget(QLabel("Version 0.1.0")) 
