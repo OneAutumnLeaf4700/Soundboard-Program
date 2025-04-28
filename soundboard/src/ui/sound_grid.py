@@ -283,6 +283,7 @@ class SoundGrid(QWidget):
         """
         Handle sort option changes
         """
+        # Update the sort options to match what's shown in the UI
         sort_options = ["name", "date", "duration"]
         if index < len(sort_options):
             self.sort_option = sort_options[index]
@@ -394,4 +395,4 @@ class SoundGrid(QWidget):
                 sound_id=f"sample_{i}",
                 duration=data["duration"],
                 favorite=data["favorite"]
-            ) 
+            )
