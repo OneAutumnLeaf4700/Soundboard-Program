@@ -88,13 +88,3 @@ soundboard/
 - Customize the theme and audio output device in settings.
 
 ---
-
-## Development
-
-- Use [Poetry](https://python-poetry.org/) for dependency management.
-- Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) style guide.
-- Run tests with `pytest`.
-- Format code with `black`.
-- Type check with `mypy`.
-
----
