@@ -135,6 +135,11 @@ class SoundCard(QFrame):
         self.sound_id = sound_id
         self.is_active = False
         self.is_favorite = is_favorite
+        
+        # Import here to avoid circular imports
+        from managers.sound_manager import SoundManager
+        self.sound_manager = SoundManager()
+        
         self._setup_ui()
         
     def _setup_ui(self):
@@ -306,10 +311,12 @@ class SoundCard(QFrame):
             """)
     
     def _toggle_favorite(self):
-        """Toggle favorite status"""
-        self.is_favorite = not self.is_favorite
-        self._update_favorite_button()
-        self.sound_clicked.emit(self.sound_id, "favorite" if self.is_favorite else "unfavorite")
+        """Toggle favorite status using sound manager"""
+        # Use the sound manager to toggle favorite status
+        if self.sound_id:
+            self.is_favorite = self.sound_manager.toggle_favorite(self.sound_id)
+            self._update_favorite_button()
+            self.sound_clicked.emit(self.sound_id, "favorite" if self.is_favorite else "unfavorite")
     
     def _show_context_menu(self):
         """Show context menu with actions"""
@@ -795,8 +802,65 @@ class SoundGridView(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.sounds = []
+        self.sound_manager = None  # Will be set by MainWindow
         self._setup_ui()
-        self._populate_sample_sounds()
+        
+    def set_sound_manager(self, sound_manager):
+        """Set the sound manager for this view"""
+        self.sound_manager = sound_manager
+        
+    def _on_add_sound_clicked(self):
+        """Handle add sound button click"""
+        if not self.sound_manager:
+            # Import here to avoid circular imports if sound_manager not set
+            from managers.sound_manager import SoundManager
+            sound_manager = SoundManager()
+        else:
+            sound_manager = self.sound_manager
+            
+        # Open file dialog and add sound
+        sound_id = sound_manager.select_and_add_sound_file(self)
+        if sound_id:
+            # Refresh the view
+            self._refresh_sounds()
+    
+    def _refresh_sounds(self):
+        """Refresh the sounds display"""
+        if not self.sound_manager:
+            return
+            
+        # Clear current sounds
+        self.sounds = []
+        
+        # Get all sounds from the sound manager
+        all_sounds = self.sound_manager.get_all_sounds()
+        
+        # Convert to list format for our view
+        for sound_id, sound_data in all_sounds.items():
+            # Add sound_id to the data
+            sound_item = sound_data.copy()
+            sound_item["id"] = sound_id
+            self.sounds.append(sound_item)
+            
+        # Clear current grid
+        while self.sound_grid.count():
+            item = self.sound_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+                
+        # Clear current list view (except the stretch at the end)
+        for i in range(self.sound_list_layout.count() - 1, -1, -1):
+            item = self.sound_list_layout.itemAt(i)
+            if item and not isinstance(item, QSpacerItem):
+                widget = item.widget()
+                if widget:
+                    self.sound_list_layout.removeWidget(widget)
+                    widget.deleteLater()
+        
+        # Recreate sound cards and list items
+        for i, sound in enumerate(self.sounds):
+            self._create_sound_card(i, sound)
+            self._create_sound_list_item(sound["id"], sound["title"], sound["category"], sound.get("is_favorite", False))
         
     def _setup_ui(self):
         self.setStyleSheet(f"""
@@ -836,6 +900,7 @@ class SoundGridView(QFrame):
         
         # Add sound button
         add_sound_btn = ModernButton("+ Add Sound", is_primary=True)
+        add_sound_btn.clicked.connect(self._on_add_sound_clicked)
         header.addWidget(add_sound_btn)
         
         layout.addLayout(header)
@@ -1189,7 +1254,151 @@ class SoundGridView(QFrame):
     def _on_sound_action(self, sound_id, action):
         """Handle sound actions"""
         print(f"Sound {sound_id} action: {action}")
-        # In a real implementation, this would handle playing, editing, etc.
+        
+        if not self.sound_manager:
+            # Import here to avoid circular imports if sound_manager not set
+            from managers.sound_manager import SoundManager
+            sound_manager = SoundManager()
+        else:
+            sound_manager = self.sound_manager
+        
+        if action == "favorite" or action == "unfavorite":
+            # Toggle favorite status
+            is_favorite = sound_manager.toggle_favorite(sound_id)
+            
+            # Update UI
+            self._update_sound_favorite_status(sound_id, is_favorite)
+            
+        elif action == "play":
+            # Play the sound
+            sound_manager.play_sound(sound_id)
+        elif action == "delete":
+            # Remove the sound
+            if sound_manager.remove_sound(sound_id):
+                # Refresh the view
+                self._refresh_sounds()
+        elif action == "edit":
+            # Edit sound functionality would go here
+            pass
+            
+    def _on_add_sound_clicked(self):
+        """Handle add sound button click"""
+        if not self.sound_manager:
+            # Import here to avoid circular imports if sound_manager not set
+            from managers.sound_manager import SoundManager
+            sound_manager = SoundManager()
+        else:
+            sound_manager = self.sound_manager
+            
+        # Open file dialog and add sound
+        sound_id = sound_manager.select_and_add_sound_file(self)
+        if sound_id:
+            # Refresh the view to show the new sound
+            self._refresh_sounds()
+            
+    def _refresh_sounds(self):
+        """Refresh the sounds display"""
+        if not self.sound_manager:
+            return
+            
+        # Clear current sounds
+        self.sounds = []
+        
+        # Get all sounds from the sound manager
+        all_sounds = self.sound_manager.get_all_sounds()
+        
+        # Convert to list format for our view
+        for sound_id, sound_data in all_sounds.items():
+            # Add sound_id to the data
+            sound_item = sound_data.copy()
+            sound_item["id"] = sound_id
+            self.sounds.append(sound_item)
+            
+        # Clear current grid
+        while self.sound_grid.count():
+            item = self.sound_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+                
+        # Clear current list view (except the stretch at the end)
+        for i in range(self.sound_list_layout.count() - 1, -1, -1):
+            item = self.sound_list_layout.itemAt(i)
+            if item and not isinstance(item, QSpacerItem):
+                widget = item.widget()
+                if widget:
+                    self.sound_list_layout.removeWidget(widget)
+                    widget.deleteLater()
+        
+        # Recreate sound cards and list items
+        for i, sound in enumerate(self.sounds):
+            self._create_sound_card(i, sound)
+            self._create_sound_list_item(sound)
+    
+    def _update_sound_favorite_status(self, sound_id, is_favorite):
+        """Update the UI to reflect the favorite status of a sound"""
+        # Update in grid view
+        for i in range(self.sound_grid.count()):
+            item = self.sound_grid.itemAt(i)
+            if item and item.widget():
+                card = item.widget()
+                if hasattr(card, 'sound_id') and card.sound_id == sound_id:
+                    card.is_favorite = is_favorite
+                    card._update_favorite_button()
+        
+        # Update in list view
+        for i in range(self.sound_list_layout.count()):
+            item = self.sound_list_layout.itemAt(i)
+            if item and item.widget() and not isinstance(item, QSpacerItem):
+                list_item = item.widget()
+                # Find the favorite button in the list item
+                for child in list_item.children():
+                    if isinstance(child, QPushButton) and child.text() in ["★", "☆"]:
+                        # Update the favorite button
+                        child.setText("★" if is_favorite else "☆")
+                        child.setStyleSheet(f"""
+                            QPushButton {{
+                                background-color: transparent;
+                                color: {('gold' if is_favorite else COLORS['text_secondary'])};
+                                border: none;
+                                font-size: 16px;
+                            }}
+                            QPushButton:hover {{
+                                color: gold;
+                            }}
+                        """)
+                        break
+                        
+    def _update_sound(self, sound_id, sound_data):
+        """Update a sound's data in the UI
+        
+        Args:
+            sound_id: The ID of the sound to update
+            sound_data: The updated sound data
+        """
+        # Check if the sound exists in our list
+        found = False
+        for i, sound in enumerate(self.sounds):
+            if sound["id"] == sound_id:
+                # Update the sound data
+                self.sounds[i] = sound_data.copy()
+                self.sounds[i]["id"] = sound_id
+                found = True
+                break
+                
+        if not found:
+            # If the sound is not in our list, add it
+            sound_item = sound_data.copy()
+            sound_item["id"] = sound_id
+            self.sounds.append(sound_item)
+            
+        # Update the UI
+        # First, update favorite status if it changed
+        if "favorite" in sound_data:
+            self._update_sound_favorite_status(sound_id, sound_data["favorite"])
+            
+        # For more complex changes, refresh the entire view
+        # This is a simple approach - for better performance, you could update just the affected widgets
+        self._refresh_sounds()
 
 class FavoriteSoundCard(SoundCard):
     """Modified SoundCard for the favorites view without the favorite button"""
@@ -1363,8 +1572,8 @@ class FavouritesView(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.favorite_sounds = []
+        self.sound_manager = None  # Will be set by MainWindow
         self._setup_ui()
-        self._populate_sample_favorites()
         
     def _setup_ui(self):
         self.setStyleSheet(f"""
@@ -1404,6 +1613,7 @@ class FavouritesView(QFrame):
         
         # Add sound button
         add_sound_btn = ModernButton("+ Add Sound", is_primary=True)
+        add_sound_btn.clicked.connect(self._on_add_sound_clicked)
         header.addWidget(add_sound_btn)
         
         layout.addLayout(header)
@@ -1538,6 +1748,23 @@ class FavouritesView(QFrame):
         
         # Add to grid
         self.favorites_grid.addWidget(card, row, col)
+    
+    def _on_add_sound_clicked(self):
+        """Handle add sound button click"""
+        if not self.sound_manager:
+            # Import here to avoid circular imports if sound_manager not set
+            from managers.sound_manager import SoundManager
+            sound_manager = SoundManager()
+        else:
+            sound_manager = self.sound_manager
+            
+        # Open file dialog and add sound
+        sound_id = sound_manager.select_and_add_sound_file(self)
+        if sound_id:
+            # Add to favorites
+            sound_manager.add_to_favorites(sound_id)
+            # Refresh the view
+            self.update_favorites()
     
     def _create_favorite_list_item(self, sound_data):
         """Create a list item for a favorite sound in list view"""
@@ -1742,8 +1969,63 @@ class FavouritesView(QFrame):
     
     def _on_favorite_action(self, sound_id, action):
         """Handle favorite sound actions"""
-        print(f"Favorite sound {sound_id}: {action}")
-        # In a real implementation, this would handle playing, editing, etc.
+        if self.sound_manager:
+            if action == "play":
+                self.sound_manager.play_sound(sound_id)
+            elif action == "edit":
+                # Handle edit action
+                pass
+            elif action == "delete":
+                # Remove the sound from favorites
+                if self.sound_manager.remove_from_favorites(sound_id):
+                    # Refresh the view
+                    self.update_favorites()
+        else:
+            print(f"Favorite sound {sound_id}: {action}")
+            
+    def update_favorites(self):
+        """Update the favorites display with current data from sound manager"""
+        if not self.sound_manager:
+            return
+            
+        # Get all favorites from the sound manager
+        self.favorite_sounds = self.sound_manager.get_favorites()
+        
+        # Clear current grid
+        while self.favorites_grid.count():
+            item = self.favorites_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+                
+        # Clear current list view (except the stretch at the end)
+        for i in range(self.favorites_list_layout.count() - 1, -1, -1):
+            item = self.favorites_list_layout.itemAt(i)
+            if item and not isinstance(item, QSpacerItem):
+                widget = item.widget()
+                if widget:
+                    self.favorites_list_layout.removeWidget(widget)
+                    widget.deleteLater()
+        
+        # Create favorite sound cards for grid view and list items for list view
+        for i, sound in enumerate(self.favorite_sounds):
+            self._create_favorite_card(i, sound)
+            self._create_favorite_list_item(sound)
+            
+    def set_sound_manager(self, sound_manager):
+        """Set the sound manager for this view"""
+        self.sound_manager = sound_manager
+        
+    def _update_sound(self, sound_id, sound_data):
+        """Update a specific sound in the favorites view"""
+        # Check if this sound is in our favorites list
+        for i, sound in enumerate(self.favorite_sounds):
+            if sound.get('id') == sound_id:
+                # Update the sound data
+                self.favorite_sounds[i] = sound_data.copy()
+                self.favorite_sounds[i]['id'] = sound_id
+                # Refresh the display
+                self.update_favorites()
+                break
 
 class FolderView(QFrame):
     """Folder view for organizing sounds"""
@@ -1766,11 +2048,18 @@ class FolderView(QFrame):
         self.sound_count = 0
         self.folder_id = "root"
         
+        # Sound manager will be set by MainWindow
+        self.sound_manager = None
+        
         # Setup UI
         self._setup_ui()
         
         # Populate with sample data
         self._populate_sample_folders()
+        
+    def set_sound_manager(self, sound_manager):
+        """Set the sound manager for this view"""
+        self.sound_manager = sound_manager
         
     def _setup_ui(self):
         self.setStyleSheet(f"""
@@ -2202,10 +2491,12 @@ class FolderContentView(QFrame):
         self.current_view = "grid"  # Default to grid view
         self.current_size = "medium"  # Default size
         self.sounds = []  # Initialize sounds list
+        self.sound_manager = None  # Will be set by MainWindow
         self._setup_ui()
         
-        # Populate with some sample sounds in this folder
-        self._populate_sample_sounds()
+    def set_sound_manager(self, sound_manager):
+        """Set the sound manager for this view"""
+        self.sound_manager = sound_manager
         
     def _setup_ui(self):
         self.setStyleSheet(f"""
@@ -2238,6 +2529,7 @@ class FolderContentView(QFrame):
         header.addStretch()
         
         add_sound_btn = ModernButton("+ Add Sound", is_primary=True)
+        add_sound_btn.clicked.connect(self._on_add_sound_clicked)
         header.addWidget(add_sound_btn)
         
         layout.addLayout(header)
@@ -2624,8 +2916,31 @@ class FolderContentView(QFrame):
 
     def _on_sound_action(self, sound_id, action):
         """Handle sound actions"""
-        print(f"Sound {sound_id} action: {action}")
-        # TODO: Implement sound actions
+        if not self.sound_manager:
+            print(f"Sound {sound_id} action: {action} - No sound manager available")
+            return
+            
+        if action == "play":
+            # Play the sound
+            self.sound_manager.play_sound(sound_id)
+        elif action == "favorite":
+            # Toggle favorite status
+            if self.sound_manager.is_favorite(sound_id):
+                self.sound_manager.remove_from_favorites(sound_id)
+            else:
+                self.sound_manager.add_to_favorites(sound_id)
+            # Update UI
+            self._refresh_sounds()
+        elif action == "delete":
+            # Remove the sound
+            self.sound_manager.remove_sound(sound_id)
+            # Update UI
+            self._refresh_sounds()
+        elif action == "edit":
+            # TODO: Implement sound editing
+            pass
+        else:
+            print(f"Sound {sound_id} action: {action} - Not implemented")
 
 class MainWindow(QMainWindow):
     """Main application window"""
@@ -2634,6 +2949,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("SoundWave")
         self.setMinimumSize(1200, 800)
+        
+        # Initialize sound manager
+        from managers.sound_manager import SoundManager
+        self.sound_manager = SoundManager()
         
         # Set window style
         self.setStyleSheet(f"""
@@ -2662,6 +2981,9 @@ class MainWindow(QMainWindow):
         self.control_panel = ControlPanel()
         self.main_layout.addWidget(self.content_area)
         self.main_layout.addWidget(self.control_panel)
+        
+        # Connect sound manager signals
+        self._connect_sound_manager_signals()
 
     def _init_ui(self):
         """Initialize UI components"""
@@ -2784,5 +3106,55 @@ class MainWindow(QMainWindow):
         self.setStatusBar(status_bar)
         
         # Add status bar widgets
-        status_bar.addWidget(QLabel("4 sounds loaded"))
-        status_bar.addPermanentWidget(QLabel("Version 0.1.0")) 
+        self.status_label = QLabel("4 sounds loaded")
+        status_bar.addWidget(self.status_label)
+        status_bar.addPermanentWidget(QLabel("Version 0.1.0"))
+    
+    def _connect_sound_manager_signals(self):
+        """Connect sound manager signals to update UI"""
+        # Connect signals from sound manager to update UI
+        self.sound_manager.favorite_added.connect(self._on_favorite_added)
+        self.sound_manager.favorite_removed.connect(self._on_favorite_removed)
+        self.sound_manager.sound_updated.connect(self._on_sound_updated)
+        self.sound_manager.sound_played.connect(self._on_sound_played)
+        
+        # Set sound manager for views
+        self.favorites_view.set_sound_manager(self.sound_manager)
+        self.all_sounds_view.set_sound_manager(self.sound_manager)
+        self.folders_view.set_sound_manager(self.sound_manager)
+    
+    def _on_favorite_added(self, sound_id):
+        """Handle when a sound is added to favorites"""
+        # Update favorites view
+        self.favorites_view.update_favorites()
+        
+        # Update status bar
+        self.status_bar_message(f"Sound added to favorites")
+    
+    def _on_favorite_removed(self, sound_id):
+        """Handle when a sound is removed from favorites"""
+        # Update favorites view
+        self.favorites_view.update_favorites()
+        
+        # Update status bar
+        self.status_bar_message(f"Sound removed from favorites")
+    
+    def _on_sound_updated(self, sound_id, sound_data):
+        """Handle when a sound is updated"""
+        # Update all views
+        self.all_sounds_view._update_sound(sound_id, sound_data)
+        self.favorites_view._update_sound(sound_id, sound_data)
+        
+        # Update status bar
+        self.status_bar_message(f"Sound updated: {sound_data.get('title', 'Unknown')}")
+    
+    def _on_sound_played(self, sound_id):
+        """Handle when a sound is played"""
+        # Update status bar
+        sound_data = self.sound_manager.get_sound(sound_id)
+        if sound_data:
+            self.status_bar_message(f"Playing: {sound_data.get('title', 'Unknown')}")
+    
+    def status_bar_message(self, message, timeout=3000):
+        """Show a message in the status bar"""
+        self.statusBar().showMessage(message, timeout)
