@@ -1,0 +1,12 @@
+[run]
+source = soundboard/src
+branch = False
+omit =
+    soundboard/src/main.py
+    soundboard/src/ui/*
+    tests/*
+
+[report]
+show_missing = True
+skip_covered = False
+precision = 1
