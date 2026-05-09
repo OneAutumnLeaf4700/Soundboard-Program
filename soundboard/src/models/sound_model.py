@@ -1,8 +1,12 @@
 """Sound data model for the soundboard application"""
 
-import os
 import json
+import logging
+import os
 from typing import Dict, List, Optional, Any
+
+logger = logging.getLogger(__name__)
+
 
 class SoundModel:
     """Model for managing sound data including favorites"""
@@ -34,7 +38,7 @@ class SoundModel:
                     self.sounds = data.get('sounds', {})
                     self.favorites = data.get('favorites', [])
             except (json.JSONDecodeError, IOError) as e:
-                print(f"Error loading sound data: {e}")
+                logger.error("Error loading sound data: %s", e)
     
     def _save_data(self) -> None:
         """Save sound data to the JSON file"""
@@ -45,7 +49,7 @@ class SoundModel:
                     'favorites': self.favorites
                 }, f, indent=2)
         except IOError as e:
-            print(f"Error saving sound data: {e}")
+            logger.error("Error saving sound data: %s", e)
     
     def add_sound(self, sound_id: str, sound_data: Dict[str, Any]) -> None:
         """Add or update a sound in the collection

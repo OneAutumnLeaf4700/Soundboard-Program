@@ -10,7 +10,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QColor
 
 # Import colors from main_window for consistency
-from soundboard.src.ui.main_window import COLORS
+from ui.main_window import COLORS
 
 class FolderItem(QFrame):
     """

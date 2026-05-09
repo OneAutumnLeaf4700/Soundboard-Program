@@ -11,8 +11,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon
 
 # Import from other modules
-from soundboard.src.ui.sound_card import SoundCard
-from soundboard.src.ui.main_window import COLORS
+from ui.sound_card import SoundCard
+from ui.main_window import COLORS
 
 class SoundGrid(QWidget):
     """

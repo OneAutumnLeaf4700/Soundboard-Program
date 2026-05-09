@@ -2,7 +2,6 @@ PyQt6>=6.4.0
 sounddevice>=0.5.2
 numpy>=1.24.0
 pydub>=0.25.1
-pywin32>=306
-keyboard>=0.13.5
-watchdog>=3.0.0
-audioop-lts>=0.2.1
+# pydub uses the audioop module, which was removed in Python 3.13.
+# audioop-lts provides the polyfill.
+audioop-lts>=0.2.1; python_version >= '3.13'

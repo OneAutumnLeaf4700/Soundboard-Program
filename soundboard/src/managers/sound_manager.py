@@ -1,5 +1,6 @@
 """Sound manager for the soundboard application"""
 
+import logging
 import os
 import uuid
 from typing import Dict, List, Optional, Any, Callable
@@ -9,6 +10,9 @@ from PyQt6.QtWidgets import QFileDialog
 # Import the sound model and audio player
 from models.sound_model import SoundModel
 from managers.audio_player import AudioPlayer
+
+logger = logging.getLogger(__name__)
+
 
 class SoundManager(QObject):
     """Manager for handling sound operations"""
@@ -265,5 +269,5 @@ class SoundManager(QObject):
             sound_id: Unique identifier for the sound
             error_message: Error message
         """
-        print(f"Playback error for sound {sound_id}: {error_message}")
+        logger.error("Playback error for sound %s: %s", sound_id, error_message)
         self.current_playing = None

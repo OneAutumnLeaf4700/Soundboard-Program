@@ -1,90 +1,125 @@
-# Soundboard Program
+# Soundboard
 
-A modern, professional soundboard application for Windows, built with Python and PyQt6. Designed for streamers, presenters, and audio enthusiasts, this app makes it easy to play, organize, and customize sounds with a beautiful, intuitive interface.
+> A modern Windows soundboard for streamers and presenters — trigger sounds with hotkeys, organise into folders, manage favourites, and persist between sessions. Built with Python and PyQt6.
 
----
+[![Tests](https://github.com/OneAutumnLeaf4700/Soundboard-Program/actions/workflows/tests.yml/badge.svg)](https://github.com/OneAutumnLeaf4700/Soundboard-Program/actions/workflows/tests.yml)
+[![Latest Release](https://img.shields.io/github/v/release/OneAutumnLeaf4700/Soundboard-Program)](https://github.com/OneAutumnLeaf4700/Soundboard-Program/releases)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue?logo=python)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Table of Contents
-
-- [Features](#features)
-- [Technical Overview](#technical-overview)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Development](#development)
-
----
+<!-- TODO: replace with a 20-second GIF demo (hotkey trigger + sound playing visually). Save as docs/demo.gif. -->
 
 ## Features
 
-- 🎵 **Multiple Audio Format Support:** Play MP3, WAV, and more.
-- 🖱️ **Modern, User-Friendly Interface:** Clean, responsive design with PyQt6.
-- ➕ **Custom Sound Import:** Easily add your own audio files.
-- ⌨️ **Hotkey Support:** Trigger sounds instantly with customizable hotkeys.
-- 🖥️ **System Tray Integration:** Control the app from your system tray.
-- 🎚️ **Multiple Audio Device Support:** Choose your output device.
-- 📊 **Sound Visualization:** See real-time audio visualizations.
-- 🌗 **Theme Customization:** Light and dark modes for any environment.
+- 🎵 **Multi-format audio** — MP3, WAV, OGG, FLAC, and anything pydub can decode
+- 🖱️ **Modern PyQt6 UI** — dark theme, gradient cards, grid + list views
+- 📁 **Folder organisation** — group sounds by category with a sidebar folder view
+- ⭐ **Favourites** — pin frequently used sounds to a dedicated tab
+- 💾 **Persistent storage** — sound metadata stored as JSON in `~/.soundboard/sounds.json`
+- 🎚️ **Audio device selection** — route output to any device exposed by `sounddevice`
 
----
+## Tested platforms
 
-## Technical Overview
+- Windows 10 / 11 (primary target — prebuilt `.exe` available on the Releases page)
+- Linux works from source (PortAudio + Qt platform plugins required)
+- macOS untested
 
-The Soundboard Program is structured for maintainability and scalability:
+## Prerequisites
 
-- **Python & PyQt6:** Leverages PyQt6 for a native Windows look and feel.
-- **Modular UI Components:** All UI elements are organized in `src/ui/components.py` and related files.
-- **Main Application:** Entry point at `src/main.py`.
-- **Audio Management:** Supports multiple formats and devices.
-- **Hotkey & Tray Integration:** Uses platform-specific APIs for seamless user experience.
-
-**Directory Structure:**
-```
-soundboard/
-  ├─ src/
-  │   ├─ main.py
-  │   └─ ui/
-  │       ├─ components.py
-  │       ├─ folder_view.py
-  │       ├─ main_window.py
-  │       ├─ sound_card.py
-  │       └─ sound_grid.py
-  └─ pyproject.toml
-```
-
----
-
-## Requirements
-
-- Python 3.8 or higher
-- Windows 10/11
-
----
+- **Python 3.8+** (only needed for running from source)
+- **PortAudio** — required by `sounddevice` for output. Bundled with the prebuilt `.exe`. On Linux: `sudo apt install libportaudio2`. On macOS: `brew install portaudio`.
 
 ## Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yourusername/soundboard.git
-   cd soundboard
-   ```
+### Option 1 — Prebuilt Windows executable (recommended)
+1. Go to the [Releases](https://github.com/OneAutumnLeaf4700/Soundboard-Program/releases) page
+2. Download the latest `Soundboard.exe`
+3. Double-click to run
 
-2. **Install dependencies using Poetry:**
-   ```bash
-   poetry install
-   ```
+### Option 2 — From source
+```bash
+git clone https://github.com/OneAutumnLeaf4700/Soundboard-Program.git
+cd Soundboard-Program
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cd soundboard/src
+python main.py
+```
 
-3. **Run the application:**
-   ```bash
-   poetry run python src/main.py
-   ```
-
----
+> Run from `soundboard/src` — that's the directory `main.py` expects to be its working directory for its relative imports.
 
 ## Usage
 
-- Launch the app and start adding your favorite sounds.
-- Assign hotkeys for quick access.
-- Customize the theme and audio output device in settings.
+1. **Launch** — the main window opens with empty Sounds, Favourites, and Folders tabs
+2. **Add sounds** — use the *Add Sound* button to import audio files; the app stores their metadata in `~/.soundboard/sounds.json`
+3. **Play** — click any sound card to play it; click again to stop
+4. **Organise** — create folders in the Folders tab and drag sounds into them
+5. **Favourite** — right-click a sound and choose Favourite to pin it to the Favourites tab
+6. **Audio device** — pick output device in Settings (uses sounddevice's enumeration)
 
----
+Set the env var `SOUNDBOARD_DEBUG=1` before launching for verbose logging.
+
+## Development
+
+### Setup
+```bash
+git clone https://github.com/OneAutumnLeaf4700/Soundboard-Program.git
+cd Soundboard-Program
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
+
+### Run tests
+```bash
+pytest --cov=soundboard/src --cov-report=term-missing
+```
+
+### Project layout
+```
+Soundboard-Program/
+├── soundboard/
+│   ├── pyproject.toml
+│   └── src/
+│       ├── main.py                     # Entry point — configures logging, launches GUI
+│       ├── managers/
+│       │   ├── audio_player.py         # sounddevice + pydub playback
+│       │   └── sound_manager.py        # CRUD over sounds + favourites
+│       ├── models/
+│       │   └── sound_model.py          # JSON persistence at ~/.soundboard/sounds.json
+│       └── ui/
+│           ├── main_window.py          # Main window, COLORS palette
+│           ├── sound_card.py           # Single-sound widget
+│           ├── sound_grid.py           # Grid layout for sound cards
+│           ├── folder_view.py          # Folder sidebar
+│           └── components.py           # Reusable widgets
+├── tests/                              # pytest suite
+├── docs/                               # Screenshots, design notes
+├── .github/workflows/                  # CI: tests, build/release
+├── requirements.txt                    # Runtime deps
+├── requirements-dev.txt                # Test/lint deps
+└── LICENSE
+```
+
+## Troubleshooting
+
+**"No audio output device found".** Install PortAudio — see Prerequisites. On Linux, also confirm your user is in the `audio` group.
+
+**Playing a sound does nothing.** Check the log (`SOUNDBOARD_DEBUG=1`); `pydub` may have failed to decode the file. MP3 / WAV / OGG / FLAC should all work; some exotic codecs require ffmpeg.
+
+**Sounds don't persist between sessions.** The app writes to `~/.soundboard/sounds.json`. If that path isn't writable (e.g. running on a locked-down system), persistence will silently fail — check the log for `Error saving sound data` lines.
+
+**Wanted to delete a sound but Edit option is missing.** Sound editing isn't implemented yet — only Delete and Favourite are wired up. Open an issue if you'd find Edit useful.
+
+## Contributing
+
+Issues and PRs welcome. Please:
+- Open an issue first to discuss any non-trivial change
+- Run `pytest` and ensure tests pass before submitting
+- Follow PEP 8 (formatted with [black](https://black.readthedocs.io/))
+
+## License
+
+[MIT](LICENSE) © 2026 Rayyan

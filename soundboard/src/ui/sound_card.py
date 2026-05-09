@@ -2,8 +2,10 @@
 SoundCard Implementation for the Soundboard
 """
 
+import logging
+
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFrame, QProgressBar, QMenu,
     QSizePolicy
 )
@@ -11,7 +13,9 @@ from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QIcon, QColor, QAction
 
 # Import from other modules
-from soundboard.src.ui.main_window import COLORS
+from ui.main_window import COLORS
+
+logger = logging.getLogger(__name__)
 
 class SoundCard(QWidget):
     """
@@ -232,7 +236,7 @@ class SoundCard(QWidget):
         
         # Delete action
         delete_action = QAction("Delete", self)
-        delete_action.triggered.connect(lambda: print(f"Delete sound {self.sound_id}"))  # To be connected later
+        delete_action.triggered.connect(lambda: logger.info("Delete sound %s", self.sound_id))  # To be connected later
         self.context_menu.addAction(delete_action)
     
     def _show_context_menu(self):

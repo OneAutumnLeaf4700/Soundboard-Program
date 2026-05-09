@@ -2,6 +2,8 @@
 Main Window Implementation with Enhanced Modern Design
 """
 
+import logging
+
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QStatusBar, QMenuBar, QMenu, QLabel,
@@ -12,6 +14,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QPoint, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QAction, QIcon, QColor, QPalette, QLinearGradient, QGradient, QPainter, QPainterPath
+
+logger = logging.getLogger(__name__)
 
 # Enhanced color scheme
 COLORS = {
@@ -58,6 +62,18 @@ COLORS = {
     'favorite_hover': '#FFC107',  # Lighter gold for hover
     'delete_color': '#E53935',  # Red color for delete button
     'accent_color': '#1DB954',  # Add accent color for folder icon
+    # Aliases / extras consumed by sound_card.py + sound_grid.py.
+    # Kept distinct from card_gradient_* so plain (non-gradient) panels
+    # have a stable background color.
+    'card_bg': '#1F1F1F',
+    'favorite': '#FFD700',  # alias of favorite_color, used in sound_card
+    'progress_bg': '#3A3A3A',
+    # Additional keys referenced by main_window.py / folder_view.py that
+    # were missing — would have raised KeyError at runtime.
+    'accent_pressed': '#169C46',  # darker accent for pressed state
+    'folder_selected': '#3A3A3A',  # highlighted folder
+    'scroll_handle': '#404040',   # alias of scrollbar_handle
+    'sidebar_bg': '#181818',      # sidebar / left panel background
 }
 
 class SearchBar(QLineEdit):
@@ -1220,7 +1236,7 @@ class SoundGridView(QFrame):
     
     def _sort_sounds(self, sort_by):
         """Sort sounds according to criteria"""
-        print(f"Sorting sounds by: {sort_by}")
+        logger.debug("Sorting sounds by: %s", sort_by)
         
         # Get a copy of sound data to sort
         sorted_sounds = self.sounds.copy()
@@ -1253,7 +1269,7 @@ class SoundGridView(QFrame):
             
     def _on_sound_action(self, sound_id, action):
         """Handle sound actions"""
-        print(f"Sound {sound_id} action: {action}")
+        logger.debug("Sound %s action: %s", sound_id, action)
         
         if not self.sound_manager:
             # Import here to avoid circular imports if sound_manager not set
@@ -1895,7 +1911,7 @@ class FavouritesView(QFrame):
     
     def _change_size(self, size):
         """Change the size of favorite sound cards in grid view"""
-        print(f"Changed favorites size to: {size}")
+        logger.debug("Changed favorites size to: %s", size)
         self.current_size = size
         
         sizes = {
@@ -1932,7 +1948,7 @@ class FavouritesView(QFrame):
     
     def _sort_favorites(self, sort_by):
         """Sort favorite sounds according to criteria"""
-        print(f"Sorting favorites by: {sort_by}")
+        logger.debug("Sorting favorites by: %s", sort_by)
         self.current_sort = sort_by
         
         # Get a copy of favorite sound data to sort
@@ -1981,7 +1997,7 @@ class FavouritesView(QFrame):
                     # Refresh the view
                     self.update_favorites()
         else:
-            print(f"Favorite sound {sound_id}: {action}")
+            logger.debug("Favorite sound %s: %s", sound_id, action)
             
     def update_favorites(self):
         """Update the favorites display with current data from sound manager"""
@@ -2422,7 +2438,7 @@ class FolderView(QFrame):
     
     def _sort_folders(self, sort_by):
         """Sort folders according to criteria"""
-        print(f"Sorting folders by: {sort_by}")
+        logger.debug("Sorting folders by: %s", sort_by)
         
         # Get folder data and sort it
         folder_list = list(self.folders.values())
@@ -2823,13 +2839,14 @@ class FolderContentView(QFrame):
         self.view_stack.setCurrentIndex(0 if is_grid_view else 1)
     
     def _change_size(self, size):
-        """Change the size of cards in grid view"""
+        """Store the requested grid card size for this tab."""
+        # The size is read by the view layer on next render; nothing further
+        # to do here.
         self.current_size = size
-        # TODO: Implement size adjustment
-    
+
     def _sort_sounds(self, sort_by):
         """Sort sounds according to criteria"""
-        print(f"Sorting folder content sounds by: {sort_by}")
+        logger.debug("Sorting folder content sounds by: %s", sort_by)
         self.current_sort = sort_by
         
         # Get a copy of sound data to sort
@@ -2917,7 +2934,7 @@ class FolderContentView(QFrame):
     def _on_sound_action(self, sound_id, action):
         """Handle sound actions"""
         if not self.sound_manager:
-            print(f"Sound {sound_id} action: {action} - No sound manager available")
+            logger.warning("Sound %s action %s requested but no sound manager available", sound_id, action)
             return
             
         if action == "play":
@@ -2936,11 +2953,8 @@ class FolderContentView(QFrame):
             self.sound_manager.remove_sound(sound_id)
             # Update UI
             self._refresh_sounds()
-        elif action == "edit":
-            # TODO: Implement sound editing
-            pass
         else:
-            print(f"Sound {sound_id} action: {action} - Not implemented")
+            logger.warning("Sound %s action %s — not implemented", sound_id, action)
 
 class MainWindow(QMainWindow):
     """Main application window"""

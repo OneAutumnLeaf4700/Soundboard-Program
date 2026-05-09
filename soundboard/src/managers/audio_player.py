@@ -1,11 +1,15 @@
 """Audio player for the soundboard application"""
 
+import logging
 import os
 import sounddevice as sd
 import numpy as np
 from pydub import AudioSegment
 from typing import Optional, Dict, Any
 from PyQt6.QtCore import QObject, pyqtSignal
+
+logger = logging.getLogger(__name__)
+
 
 class AudioPlayer(QObject):
     """Audio player for playing sound files"""
@@ -33,7 +37,7 @@ class AudioPlayer(QObject):
         """
         try:
             if not os.path.exists(file_path):
-                print(f"Sound file not found: {file_path}")
+                logger.warning("Sound file not found: %s", file_path)
                 return False
                 
             # Load the audio file using pydub
@@ -48,10 +52,10 @@ class AudioPlayer(QObject):
             
             return True
         except Exception as e:
-            print(f"Error loading sound: {e}")
+            logger.exception("Error loading sound %s", sound_id)
             self.playback_error.emit(sound_id, str(e))
             return False
-    
+
     def play_sound(self, sound_id: str) -> bool:
         """Play a sound
         
@@ -62,7 +66,7 @@ class AudioPlayer(QObject):
             True if the sound was played, False otherwise
         """
         if sound_id not in self.loaded_sounds:
-            print(f"Sound not loaded: {sound_id}")
+            logger.warning("Sound not loaded: %s", sound_id)
             return False
             
         try:
@@ -86,7 +90,7 @@ class AudioPlayer(QObject):
             
             return True
         except Exception as e:
-            print(f"Error playing sound: {e}")
+            logger.exception("Error playing sound %s", sound_id)
             self.playback_error.emit(sound_id, str(e))
             return False
     

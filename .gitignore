@@ -1,3 +1,38 @@
-#Ignore pycache
+# Python cache
 __pycache__/
-*/__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Distribution / build
+build/
+dist/
+*.egg-info/
+*.spec.bak
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# User data — the app stores sound metadata in ~/.soundboard
+.soundboard/
+
+# Environment
+.env
+.env.*
