@@ -3136,7 +3136,13 @@ class MainWindow(QMainWindow):
         self.favorites_view.set_sound_manager(self.sound_manager)
         self.all_sounds_view.set_sound_manager(self.sound_manager)
         self.folders_view.set_sound_manager(self.sound_manager)
-    
+
+        # Load persisted sounds into the views immediately — without this,
+        # sounds saved from a previous session don't appear until the user
+        # adds a new one or triggers another refresh-causing action.
+        self.all_sounds_view._refresh_sounds()
+        self.favorites_view.update_favorites()
+
     def _on_favorite_added(self, sound_id):
         """Handle when a sound is added to favorites"""
         # Update favorites view

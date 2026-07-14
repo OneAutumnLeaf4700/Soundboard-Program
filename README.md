@@ -7,7 +7,7 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue?logo=python)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<!-- TODO: replace with a 20-second GIF demo (hotkey trigger + sound playing visually). Save as docs/demo.gif. -->
+![App banner](docs/screenshots/banner.png)
 
 ## Features
 
