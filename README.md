@@ -13,7 +13,7 @@
 
 - 🎵 **Multi-format audio** — MP3, WAV, OGG, FLAC, and anything pydub can decode
 - 🖱️ **Modern PyQt6 UI** — dark theme, gradient cards, grid + list views
-- 📁 **Folder organisation** — group sounds by category with a sidebar folder view
+- 📁 **Folder organisation** — group sounds by category with a sidebar folder view *(currently shows sample data — see Known Limitations)*
 - ⭐ **Favourites** — pin frequently used sounds to a dedicated tab
 - 💾 **Persistent storage** — sound metadata stored as JSON in `~/.soundboard/sounds.json`
 - 🎚️ **Audio device selection** — route output to any device exposed by `sounddevice`
@@ -102,6 +102,10 @@ Soundboard-Program/
 ├── requirements-dev.txt                # Test/lint deps
 └── LICENSE
 ```
+
+## Known Limitations
+
+**Folders tab shows sample data, not your real sounds.** The Folders view currently renders a hardcoded demo folder structure rather than reading from your actual sound library — folder assignment isn't wired to the persistence layer yet. All Sounds and Favourites both reflect your real, persisted data correctly.
 
 ## Troubleshooting
 
